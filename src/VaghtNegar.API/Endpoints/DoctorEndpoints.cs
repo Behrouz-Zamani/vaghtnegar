@@ -1,0 +1,73 @@
+using VaghtNegar.Application.Doctors;
+
+namespace VaghtNegar.API.Endpoints;
+
+public static class DoctorEndpoints
+{
+    public static IEndpointRouteBuilder MapDoctorEndpoints(this IEndpointRouteBuilder endpoints)
+    {
+        var group = endpoints.MapGroup("/api/v1/doctors").WithTags("Doctors");
+
+        group.MapGet("/", async (Guid? clinicId, DoctorService service, CancellationToken ct) =>
+            Results.Ok(await service.GetAllAsync(clinicId, ct))).WithName("GetDoctors");
+
+        group.MapGet("/{id:guid}", async (Guid id, DoctorService service, CancellationToken ct) =>
+        {
+            var doctor = await service.GetByIdAsync(id, ct);
+            return doctor is null ? Results.NotFound() : Results.Ok(doctor);
+        }).WithName("GetDoctorById");
+
+        group.MapPost("/", async (CreateDoctorRequest request, DoctorService service, CancellationToken ct) =>
+        {
+            var errors = Validate(request.FirstName, request.LastName, request.MedicalCode);
+            if (errors is not null) return Results.ValidationProblem(errors);
+            if (request.ClinicId == Guid.Empty)
+                return Results.ValidationProblem(new Dictionary<string, string[]> { ["clinicId"] = ["شناسه کلینیک الزامی است."] });
+            try
+            {
+                var doctor = await service.CreateAsync(request.ClinicId, request.FirstName, request.LastName, request.MedicalCode, ct);
+                return Results.Created($"/api/v1/doctors/{doctor.Id}", doctor);
+            }
+            catch (ClinicNotFoundException ex)
+            {
+                return Results.NotFound(new { message = "کلینیک موردنظر یافت نشد.", clinicId = ex.ClinicId });
+            }
+            catch (ClinicInactiveException ex)
+            {
+                return Results.Conflict(new { message = "امکان ثبت پزشک در کلینیک غیرفعال وجود ندارد.", clinicId = ex.ClinicId });
+            }
+        }).WithName("CreateDoctor");
+
+        group.MapPut("/{id:guid}", async (Guid id, UpdateDoctorRequest request, DoctorService service, CancellationToken ct) =>
+        {
+            var errors = Validate(request.FirstName, request.LastName, request.MedicalCode);
+            if (errors is not null) return Results.ValidationProblem(errors);
+            var doctor = await service.UpdateAsync(id, request.FirstName, request.LastName, request.MedicalCode, ct);
+            return doctor is null ? Results.NotFound() : Results.Ok(doctor);
+        }).WithName("UpdateDoctor");
+
+        group.MapPatch("/{id:guid}/active", async (Guid id, SetDoctorActiveRequest request, DoctorService service, CancellationToken ct) =>
+        {
+            var doctor = await service.SetActiveAsync(id, request.IsActive, ct);
+            return doctor is null ? Results.NotFound() : Results.Ok(doctor);
+        }).WithName("SetDoctorActive");
+
+        return endpoints;
+    }
+
+    private static Dictionary<string, string[]>? Validate(string? firstName, string? lastName, string? medicalCode)
+    {
+        var errors = new Dictionary<string, string[]>();
+        if (string.IsNullOrWhiteSpace(firstName)) errors["firstName"] = ["نام پزشک الزامی است."];
+        else if (firstName.Trim().Length > 100) errors["firstName"] = ["نام حداکثر ۱۰۰ کاراکتر است."];
+        if (string.IsNullOrWhiteSpace(lastName)) errors["lastName"] = ["نام خانوادگی پزشک الزامی است."];
+        else if (lastName.Trim().Length > 100) errors["lastName"] = ["نام خانوادگی حداکثر ۱۰۰ کاراکتر است."];
+        if (!string.IsNullOrWhiteSpace(medicalCode) && medicalCode.Trim().Length > 50)
+            errors["medicalCode"] = ["کد نظام پزشکی حداکثر ۵۰ کاراکتر است."];
+        return errors.Count == 0 ? null : errors;
+    }
+}
+
+public sealed record CreateDoctorRequest(Guid ClinicId, string FirstName, string LastName, string? MedicalCode);
+public sealed record UpdateDoctorRequest(string FirstName, string LastName, string? MedicalCode);
+public sealed record SetDoctorActiveRequest(bool IsActive);
