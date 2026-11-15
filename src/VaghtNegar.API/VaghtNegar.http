@@ -1,0 +1,14 @@
+@VaghtNegar_API_HostAddress = http://localhost:5180
+
+GET {{VaghtNegar_API_HostAddress}}/
+Accept: application/json
+
+###
+
+GET {{VaghtNegar_API_HostAddress}}/health/live
+Accept: application/json
+
+###
+
+GET {{VaghtNegar_API_HostAddress}}/health/ready
+Accept: application/json
