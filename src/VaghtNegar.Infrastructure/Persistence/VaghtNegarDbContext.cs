@@ -40,7 +40,7 @@ public sealed class VaghtNegarDbContext(DbContextOptions<VaghtNegarDbContext> op
             entity.Property(x => x.FirstName).HasMaxLength(100).IsRequired();
             entity.Property(x => x.LastName).HasMaxLength(100).IsRequired();
             entity.Property(x => x.MobileNumber).HasMaxLength(20).IsRequired();
-            entity.HasIndex(x => x.MobileNumber);
+            entity.HasIndex(x => x.MobileNumber).IsUnique();
         });
 
         modelBuilder.Entity<Appointment>(entity =>
