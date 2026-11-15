@@ -1,0 +1,4 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><RootNamespace>VaghtNegar.Application</RootNamespace></PropertyGroup>
+  <ItemGroup><ProjectReference Include="../VaghtNegar.Domain/VaghtNegar.Domain.csproj" /></ItemGroup>
+</Project>
