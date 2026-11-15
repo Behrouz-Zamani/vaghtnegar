@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Migrations;
+using VaghtNegar.Domain.Enums;
 using VaghtNegar.Infrastructure.Persistence;
 
 #nullable disable
@@ -25,7 +26,7 @@ partial class VaghtNegarDbContextModelSnapshot : ModelSnapshot
             entity.Property<Guid>("PatientId").HasColumnType("uniqueidentifier");
             entity.Property<DateTimeOffset>("StartsAtUtc").HasColumnType("datetimeoffset");
             entity.Property<DateTimeOffset>("EndsAtUtc").HasColumnType("datetimeoffset");
-            entity.Property<int>("Status").HasColumnType("int");
+            entity.Property<AppointmentStatus>("Status").HasColumnType("int");
             entity.Property<string>("PatientNote").HasMaxLength(1000).HasColumnType("nvarchar(1000)");
             entity.Property<DateTimeOffset>("CreatedAtUtc").HasColumnType("datetimeoffset");
             entity.HasKey("Id");
