@@ -14,7 +14,6 @@ builder.Services.AddInfrastructure(builder.Configuration);
 
 var app = builder.Build();
 
-// OpenAPI JSON and interactive Swagger UI are available in Development.
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
@@ -47,6 +46,7 @@ app.MapGet("/health/ready", async (VaghtNegarDbContext db, CancellationToken can
 }).WithName("Readiness");
 
 app.MapClinicEndpoints();
+app.MapDoctorEndpoints();
 
 app.Run();
 
