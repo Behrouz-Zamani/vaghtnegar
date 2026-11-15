@@ -3,8 +3,10 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using VaghtNegar.Application.Clinics;
 using VaghtNegar.Application.Doctors;
+using VaghtNegar.Application.Patients;
 using VaghtNegar.Infrastructure.Clinics;
 using VaghtNegar.Infrastructure.Doctors;
+using VaghtNegar.Infrastructure.Patients;
 using VaghtNegar.Infrastructure.Persistence;
 
 namespace VaghtNegar.Infrastructure;
@@ -19,6 +21,7 @@ public static class DependencyInjection
         services.AddDbContext<VaghtNegarDbContext>(options => options.UseSqlServer(connectionString));
         services.AddScoped<IClinicRepository, ClinicRepository>();
         services.AddScoped<IDoctorRepository, DoctorRepository>();
+        services.AddScoped<IPatientRepository, PatientRepository>();
         return services;
     }
 }
