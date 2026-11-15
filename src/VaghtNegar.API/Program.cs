@@ -1,4 +1,3 @@
-using VaghtNegar.API.Endpoints;
 using VaghtNegar.Application;
 using VaghtNegar.Infrastructure;
 using VaghtNegar.Infrastructure.Persistence;
@@ -20,7 +19,7 @@ app.MapGet("/", () => Results.Ok(new
 {
     application = "VaghtNegar",
     status = "running",
-    version = "0.2.0"
+    version = "0.1.0"
 })).WithName("GetApiInfo");
 
 app.MapGet("/health/live", () => Results.Ok(new { status = "Healthy" }))
@@ -34,8 +33,6 @@ app.MapGet("/health/ready", async (VaghtNegarDbContext db, CancellationToken can
         : Results.Problem(title: "Database unavailable", statusCode: StatusCodes.Status503ServiceUnavailable);
 }).WithName("Readiness");
 
-app.MapClinicEndpoints();
-
 app.Run();
 
-public partial class Program { }
+public partial class Program;
