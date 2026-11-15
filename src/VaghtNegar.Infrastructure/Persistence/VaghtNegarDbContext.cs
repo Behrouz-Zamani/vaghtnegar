@@ -9,6 +9,7 @@ public sealed class VaghtNegarDbContext(DbContextOptions<VaghtNegarDbContext> op
     public DbSet<Doctor> Doctors => Set<Doctor>();
     public DbSet<Patient> Patients => Set<Patient>();
     public DbSet<Appointment> Appointments => Set<Appointment>();
+    public DbSet<DoctorWorkingHour> DoctorWorkingHours => Set<DoctorWorkingHour>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -51,6 +52,17 @@ public sealed class VaghtNegarDbContext(DbContextOptions<VaghtNegarDbContext> op
             entity.Property(x => x.PatientNote).HasMaxLength(1000);
             entity.HasIndex(x => new { x.DoctorId, x.StartsAtUtc });
             entity.HasIndex(x => new { x.ClinicId, x.StartsAtUtc });
+        });
+
+        modelBuilder.Entity<DoctorWorkingHour>(entity =>
+        {
+            entity.ToTable("DoctorWorkingHours");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.DayOfWeek).HasConversion<int>();
+            entity.Property(x => x.StartTime).HasColumnType("time");
+            entity.Property(x => x.EndTime).HasColumnType("time");
+            entity.HasIndex(x => new { x.DoctorId, x.DayOfWeek, x.StartTime });
+            entity.HasOne<Doctor>().WithMany().HasForeignKey(x => x.DoctorId).OnDelete(DeleteBehavior.Cascade);
         });
     }
 }
