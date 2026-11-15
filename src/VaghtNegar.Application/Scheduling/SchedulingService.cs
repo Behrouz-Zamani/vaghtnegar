@@ -90,7 +90,8 @@ public sealed class SchedulingService(ISchedulingRepository repository)
     public static DateOnly ParseJalaliDate(string value)
     {
         if (string.IsNullOrWhiteSpace(value)) throw new ArgumentException("تاریخ شمسی الزامی است.");
-        var parts = value.Trim().Replace('-', '/').Split('/');
+        var normalized = NormalizeDigits(value.Trim()).Replace('-', '/');
+        var parts = normalized.Split('/');
         if (parts.Length != 3 ||
             !int.TryParse(parts[0], out var year) ||
             !int.TryParse(parts[1], out var month) ||
@@ -111,7 +112,7 @@ public sealed class SchedulingService(ISchedulingRepository repository)
     public static string FormatJalaliDate(DateOnly date)
     {
         var value = date.ToDateTime(TimeOnly.MinValue);
-        return $"{PersianCalendar.GetYear(value):0000}/{PersianCalendar.GetMonth(value):00}/{PersianCalendar.GetDayOfMonth(value):00}";
+        return ToPersianDigits($"{PersianCalendar.GetYear(value):0000}/{PersianCalendar.GetMonth(value):00}/{PersianCalendar.GetDayOfMonth(value):00}");
     }
 
     private static WorkingHourDto ToDto(DoctorWorkingHour x) =>
@@ -119,6 +120,14 @@ public sealed class SchedulingService(ISchedulingRepository repository)
             x.StartTime.ToString("HH:mm"), x.EndTime.ToString("HH:mm"), x.SlotDurationMinutes, x.IsActive);
 
     private static string GetDayName(DayOfWeek day) => PersianDayNames[(int)day];
+    private static string ToPersianDigits(string value) => value
+        .Replace("0", "۰").Replace("1", "۱").Replace("2", "۲").Replace("3", "۳").Replace("4", "۴")
+        .Replace("5", "۵").Replace("6", "۶").Replace("7", "۷").Replace("8", "۸").Replace("9", "۹");
+    private static string NormalizeDigits(string value) => value
+        .Replace("۰", "0").Replace("۱", "1").Replace("۲", "2").Replace("۳", "3").Replace("۴", "4")
+        .Replace("۵", "5").Replace("۶", "6").Replace("۷", "7").Replace("۸", "8").Replace("۹", "9")
+        .Replace("٠", "0").Replace("١", "1").Replace("٢", "2").Replace("٣", "3").Replace("٤", "4")
+        .Replace("٥", "5").Replace("٦", "6").Replace("٧", "7").Replace("٨", "8").Replace("٩", "9");
     private static int PersianWeekOrder(DayOfWeek day) => day == DayOfWeek.Saturday ? 0 : (int)day + 1;
     private static void EnsureDoctorId(Guid id) { if (id == Guid.Empty) throw new ArgumentException("شناسه پزشک معتبر نیست."); }
 
