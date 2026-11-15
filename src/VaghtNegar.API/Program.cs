@@ -35,4 +35,4 @@ app.MapGet("/health/ready", async (VaghtNegarDbContext db, CancellationToken can
 
 app.Run();
 
-public partial class Program;
+public partial class Program { }
