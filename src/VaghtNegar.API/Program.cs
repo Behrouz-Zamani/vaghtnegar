@@ -6,21 +6,33 @@ using VaghtNegar.Infrastructure.Persistence;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddOpenApi();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 
 var app = builder.Build();
 
+// OpenAPI JSON and interactive Swagger UI are available in Development.
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
+    app.UseSwagger();
+    app.UseSwaggerUI(options =>
+    {
+        options.SwaggerEndpoint("/swagger/v1/swagger.json", "VaghtNegar API v1");
+        options.RoutePrefix = "swagger";
+        options.DocumentTitle = "VaghtNegar API";
+    });
 }
 
 app.MapGet("/", () => Results.Ok(new
 {
     application = "VaghtNegar",
     status = "running",
-    version = "0.2.0"
+    version = "0.2.0",
+    documentation = "/swagger"
 })).WithName("GetApiInfo");
 
 app.MapGet("/health/live", () => Results.Ok(new { status = "Healthy" }))
