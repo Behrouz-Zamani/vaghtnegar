@@ -1,4 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup><RootNamespace>VaghtNegar.Application</RootNamespace></PropertyGroup>
-  <ItemGroup><ProjectReference Include="../VaghtNegar.Domain/VaghtNegar.Domain.csproj" /></ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../VaghtNegar.Domain/VaghtNegar.Domain.csproj" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.0" />
+  </ItemGroup>
 </Project>
