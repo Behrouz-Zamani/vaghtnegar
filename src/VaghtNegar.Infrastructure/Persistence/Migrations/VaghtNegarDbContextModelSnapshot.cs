@@ -57,6 +57,7 @@ partial class VaghtNegarDbContextModelSnapshot : ModelSnapshot
             entity.Property<string>("MedicalCode").HasMaxLength(50).HasColumnType("nvarchar(50)");
             entity.Property<bool>("IsActive").HasColumnType("bit");
             entity.Property<DateTimeOffset>("CreatedAtUtc").HasColumnType("datetimeoffset");
+            entity.Property<DateTimeOffset?>("UpdatedAtUtc").HasColumnType("datetimeoffset");
             entity.HasKey("Id");
             entity.HasIndex("ClinicId", "MedicalCode");
             entity.ToTable("Doctors");
