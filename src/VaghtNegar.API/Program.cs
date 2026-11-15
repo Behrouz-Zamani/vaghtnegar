@@ -30,7 +30,7 @@ app.MapGet("/", () => Results.Ok(new
 {
     application = "VaghtNegar",
     status = "running",
-    version = "0.3.0",
+    version = "0.4.0",
     documentation = "/swagger"
 })).WithName("GetApiInfo");
 
@@ -48,6 +48,7 @@ app.MapGet("/health/ready", async (VaghtNegarDbContext db, CancellationToken can
 app.MapClinicEndpoints();
 app.MapDoctorEndpoints();
 app.MapPatientEndpoints();
+app.MapSchedulingEndpoints();
 
 app.Run();
 
