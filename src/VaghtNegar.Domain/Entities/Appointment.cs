@@ -26,6 +26,8 @@ public sealed class Appointment
             throw new ArgumentException("Appointment must be in the future.", nameof(startsAtUtc));
         if (endsAtUtc <= startsAtUtc)
             throw new ArgumentException("End time must be after start time.", nameof(endsAtUtc));
+        if (patientNote?.Length > 1000)
+            throw new ArgumentException("Patient note cannot exceed 1000 characters.", nameof(patientNote));
 
         ClinicId = clinicId;
         DoctorId = doctorId;
@@ -37,14 +39,37 @@ public sealed class Appointment
 
     public void Confirm()
     {
-        if (Status != AppointmentStatus.Pending) throw new InvalidOperationException("Only pending appointments can be confirmed.");
+        if (Status != AppointmentStatus.Pending)
+            throw new InvalidOperationException("Only pending appointments can be confirmed.");
+        if (StartsAtUtc <= DateTimeOffset.UtcNow)
+            throw new InvalidOperationException("A past or started appointment cannot be confirmed.");
         Status = AppointmentStatus.Confirmed;
     }
 
     public void Cancel()
     {
-        if (Status is AppointmentStatus.Completed or AppointmentStatus.Cancelled)
-            throw new InvalidOperationException("This appointment cannot be cancelled.");
+        if (Status is not (AppointmentStatus.Pending or AppointmentStatus.Confirmed))
+            throw new InvalidOperationException("Only pending or confirmed appointments can be cancelled.");
+        if (StartsAtUtc <= DateTimeOffset.UtcNow)
+            throw new InvalidOperationException("A started or past appointment cannot be cancelled.");
         Status = AppointmentStatus.Cancelled;
+    }
+
+    public void Complete()
+    {
+        if (Status != AppointmentStatus.Confirmed)
+            throw new InvalidOperationException("Only confirmed appointments can be completed.");
+        if (EndsAtUtc > DateTimeOffset.UtcNow)
+            throw new InvalidOperationException("An appointment cannot be completed before its scheduled end time.");
+        Status = AppointmentStatus.Completed;
+    }
+
+    public void MarkNoShow()
+    {
+        if (Status != AppointmentStatus.Confirmed)
+            throw new InvalidOperationException("Only confirmed appointments can be marked as no-show.");
+        if (EndsAtUtc > DateTimeOffset.UtcNow)
+            throw new InvalidOperationException("An appointment cannot be marked as no-show before its scheduled end time.");
+        Status = AppointmentStatus.NoShow;
     }
 }
