@@ -1,10 +1,12 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using VaghtNegar.Application.Appointments;
 using VaghtNegar.Application.Clinics;
 using VaghtNegar.Application.Doctors;
 using VaghtNegar.Application.Patients;
 using VaghtNegar.Application.Scheduling;
+using VaghtNegar.Infrastructure.Appointments;
 using VaghtNegar.Infrastructure.Clinics;
 using VaghtNegar.Infrastructure.Doctors;
 using VaghtNegar.Infrastructure.Patients;
@@ -25,6 +27,7 @@ public static class DependencyInjection
         services.AddScoped<IDoctorRepository, DoctorRepository>();
         services.AddScoped<IPatientRepository, PatientRepository>();
         services.AddScoped<ISchedulingRepository, SchedulingRepository>();
+        services.AddScoped<IAppointmentBookingRepository, AppointmentBookingRepository>();
         return services;
     }
 }
