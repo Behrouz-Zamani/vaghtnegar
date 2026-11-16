@@ -10,7 +10,7 @@ public static class AppointmentBookingEndpoints
         var group = endpoints.MapGroup("/api/v1/doctors/{doctorId:guid}/appointments")
             .WithTags("Appointments");
 
-        group.MapPost("/", async (
+        group.MapPost("", async Task<IResult> (
             Guid doctorId,
             BookAppointmentRequest request,
             AppointmentBookingService service,
