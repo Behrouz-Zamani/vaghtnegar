@@ -30,7 +30,7 @@ app.MapGet("/", () => Results.Ok(new
 {
     application = "VaghtNegar",
     status = "running",
-    version = "0.5.0",
+    version = "0.6.0",
     documentation = "/swagger"
 })).WithName("GetApiInfo");
 
@@ -50,6 +50,7 @@ app.MapDoctorEndpoints();
 app.MapPatientEndpoints();
 app.MapSchedulingEndpoints();
 app.MapAppointmentBookingEndpoints();
+app.MapAppointmentManagementEndpoints();
 
 app.Run();
 
