@@ -2,6 +2,7 @@ using System.Security.Claims;
 using System.Text.Json;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
 using VaghtNegar.API.Endpoints;
 using VaghtNegar.Application;
 using VaghtNegar.Infrastructure;
@@ -9,14 +10,50 @@ using VaghtNegar.Infrastructure.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddOpenApi();
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
-
 var keycloakAuthority = builder.Configuration["Keycloak:Authority"]
     ?? "http://localhost:8080/realms/vaghtnegar";
 var keycloakAudience = builder.Configuration["Keycloak:Audience"]
     ?? "vaghtnegar-api";
+
+builder.Services.AddOpenApi();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen(options =>
+{
+    options.AddSecurityDefinition("Keycloak", new OpenApiSecurityScheme
+    {
+        Type = SecuritySchemeType.OAuth2,
+        Description = "ورود با Keycloak و روش Authorization Code + PKCE",
+        Flows = new OpenApiOAuthFlows
+        {
+            AuthorizationCode = new OpenApiOAuthFlow
+            {
+                AuthorizationUrl = new Uri($"{keycloakAuthority}/protocol/openid-connect/auth"),
+                TokenUrl = new Uri($"{keycloakAuthority}/protocol/openid-connect/token"),
+                Scopes = new Dictionary<string, string>
+                {
+                    ["openid"] = "OpenID Connect",
+                    ["profile"] = "Basic profile",
+                    ["email"] = "Email address"
+                }
+            }
+        }
+    });
+
+    options.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference
+                {
+                    Type = ReferenceType.SecurityScheme,
+                    Id = "Keycloak"
+                }
+            },
+            new[] { "openid", "profile", "email" }
+        }
+    });
+});
 
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -95,6 +132,9 @@ if (app.Environment.IsDevelopment())
         options.SwaggerEndpoint("/swagger/v1/swagger.json", "VaghtNegar API v1");
         options.RoutePrefix = "swagger";
         options.DocumentTitle = "VaghtNegar API";
+        options.OAuthClientId("vaghtnegar-web");
+        options.OAuthUsePkce();
+        options.OAuthScopes("openid", "profile", "email");
     });
 }
 
