@@ -23,7 +23,7 @@ public sealed class AppointmentManagementRepository(VaghtNegarDbContext db) : IA
 
         if (doctorId.HasValue) query = query.Where(x => x.DoctorId == doctorId.Value);
         if (patientId.HasValue) query = query.Where(x => x.PatientId == patientId.Value);
-        if (status.HasValue) query = query.Where(x => x.Status == status.Value);
+        if (status.HasValue) query = query.Where(x => x.Status == status.Value.ToString());
         if (fromUtc.HasValue) query = query.Where(x => x.StartsAtUtc >= fromUtc.Value);
         if (toUtc.HasValue) query = query.Where(x => x.StartsAtUtc < toUtc.Value);
 
