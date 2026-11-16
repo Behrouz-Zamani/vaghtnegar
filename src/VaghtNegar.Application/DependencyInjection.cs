@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using VaghtNegar.Application.Appointments;
 using VaghtNegar.Application.Clinics;
 using VaghtNegar.Application.Doctors;
 using VaghtNegar.Application.Patients;
@@ -14,6 +15,7 @@ public static class DependencyInjection
         services.AddScoped<DoctorService>();
         services.AddScoped<PatientService>();
         services.AddScoped<SchedulingService>();
+        services.AddScoped<AppointmentBookingService>();
         return services;
     }
 }
