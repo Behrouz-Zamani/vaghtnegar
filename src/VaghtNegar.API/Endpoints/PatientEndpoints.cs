@@ -56,6 +56,56 @@ public static class PatientEndpoints
             return patient is null ? Results.NotFound() : Results.Ok(patient);
         }).WithName("SetPatientActive");
 
+        group.MapPost("/{id:guid}/identity-link", async (
+            Guid id,
+            LinkPatientIdentityRequest request,
+            PatientService service,
+            CancellationToken ct) =>
+        {
+            if (string.IsNullOrWhiteSpace(request.IdentityUserId))
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["identityUserId"] = ["شناسه sub کاربر Keycloak الزامی است."]
+                });
+
+            if (!request.MobileNumberVerifiedByStaff)
+                return Results.BadRequest(new
+                {
+                    message = "اتصال حساب فقط پس از احراز شماره موبایل توسط کارمند مجاز است."
+                });
+
+            try
+            {
+                var patient = await service.LinkIdentityAccountAsync(
+                    id, request.IdentityUserId, request.MobileNumberVerifiedByStaff, ct);
+
+                return patient is null
+                    ? Results.NotFound(new { message = "پرونده بیمار یافت نشد." })
+                    : Results.Ok(new
+                    {
+                        patient.Id,
+                        patient.FirstName,
+                        patient.LastName,
+                        identityLinked = true
+                    });
+            }
+            catch (PatientIdentityAlreadyLinkedException ex)
+            {
+                return Results.Conflict(new { message = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Results.Conflict(new { message = ex.Message });
+            }
+            catch (ArgumentException ex)
+            {
+                return Results.BadRequest(new { message = ex.Message });
+            }
+        })
+        .RequireAuthorization(policy => policy.RequireRole("Receptionist", "ClinicAdmin", "SuperAdmin"))
+        .WithName("LinkPatientIdentity")
+        .WithSummary("اتصال پرونده بیمار به sub حساب Keycloak پس از احراز شماره موبایل توسط کارمند مجاز.");
+
         return endpoints;
     }
 
@@ -80,3 +130,4 @@ public static class PatientEndpoints
 
 public sealed record CreateOrUpdatePatientRequest(string FirstName, string LastName, string MobileNumber, DateOnly? BirthDate);
 public sealed record SetPatientActiveRequest(bool IsActive);
+public sealed record LinkPatientIdentityRequest(string IdentityUserId, bool MobileNumberVerifiedByStaff);
