@@ -1,4 +1,3 @@
-using System.Globalization;
 using VaghtNegar.Application.Scheduling;
 using VaghtNegar.Domain.Entities;
 
@@ -10,13 +9,14 @@ public sealed class AppointmentBookingService(
 {
     public async Task<AppointmentBookingDto> BookAsync(
         Guid doctorId,
+        string identityUserId,
         BookAppointmentRequest request,
         CancellationToken cancellationToken)
     {
         if (doctorId == Guid.Empty)
             throw new ArgumentException("شناسه پزشک معتبر نیست.");
-        if (request.PatientId == Guid.Empty)
-            throw new ArgumentException("شناسه بیمار الزامی است.");
+        if (string.IsNullOrWhiteSpace(identityUserId))
+            throw new ArgumentException("شناسه کاربر احراز هویت‌شده معتبر نیست.");
         if (request.StartsAtUtc.Offset != TimeSpan.Zero)
             throw new ArgumentException("زمان شروع باید با UTC و پسوند +00:00 ارسال شود.");
         if (request.StartsAtUtc <= DateTimeOffset.UtcNow)
@@ -52,7 +52,7 @@ public sealed class AppointmentBookingService(
 
         var result = await bookingRepository.TryBookAsync(
             doctorId,
-            request.PatientId,
+            identityUserId.Trim(),
             request.StartsAtUtc,
             endsAtUtc,
             request.PatientNote,
@@ -79,5 +79,5 @@ public sealed class AppointmentBookingService(
     }
 }
 
-public sealed class PatientForBookingNotFoundException() : Exception("بیمار فعال موردنظر یافت نشد.");
+public sealed class PatientForBookingNotFoundException() : Exception("پرونده فعال و متصل به حساب کاربری شما یافت نشد.");
 public sealed class AppointmentSlotUnavailableException() : Exception("این زمان قبلاً رزرو شده یا دیگر در دسترس نیست.");
