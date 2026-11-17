@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using VaghtNegar.Application.Appointments;
 using VaghtNegar.Application.Scheduling;
 
@@ -13,12 +14,17 @@ public static class AppointmentBookingEndpoints
         group.MapPost("", async Task<IResult> (
             Guid doctorId,
             BookAppointmentRequest request,
+            ClaimsPrincipal user,
             AppointmentBookingService service,
             CancellationToken cancellationToken) =>
         {
+            var identityUserId = user.FindFirst("sub")?.Value;
+            if (string.IsNullOrWhiteSpace(identityUserId))
+                return Results.Unauthorized();
+
             try
             {
-                var result = await service.BookAsync(doctorId, request, cancellationToken);
+                var result = await service.BookAsync(doctorId, identityUserId, request, cancellationToken);
                 return Results.Created($"/api/v1/appointments/{result.Id}", result);
             }
             catch (DoctorForScheduleNotFoundException ex)
@@ -38,8 +44,9 @@ public static class AppointmentBookingEndpoints
                 return Results.BadRequest(new { message = ex.Message });
             }
         })
+        .RequireAuthorization(policy => policy.RequireRole("Patient"))
         .WithName("BookDoctorAppointment")
-        .WithSummary("رزرو یک نوبت آزاد برای بیمار");
+        .WithSummary("رزرو نوبت برای بیمار واردشده؛ شناسه بیمار از توکن Keycloak استخراج می‌شود.");
 
         return endpoints;
     }
