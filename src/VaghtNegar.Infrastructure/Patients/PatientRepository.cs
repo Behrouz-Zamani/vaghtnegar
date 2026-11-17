@@ -31,6 +31,11 @@ public sealed class PatientRepository(VaghtNegarDbContext dbContext) : IPatientR
             x.MobileNumber == mobileNumber &&
             (!exceptPatientId.HasValue || x.Id != exceptPatientId.Value), ct);
 
+    public Task<bool> IdentityUserIdExistsAsync(string identityUserId, Guid? exceptPatientId, CancellationToken ct) =>
+        dbContext.Patients.AnyAsync(x =>
+            x.IdentityUserId == identityUserId &&
+            (!exceptPatientId.HasValue || x.Id != exceptPatientId.Value), ct);
+
     public async Task AddAsync(Patient patient, CancellationToken ct) =>
         await dbContext.Patients.AddAsync(patient, ct);
 
