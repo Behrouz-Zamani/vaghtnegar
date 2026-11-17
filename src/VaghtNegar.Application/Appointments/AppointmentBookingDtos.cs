@@ -1,6 +1,6 @@
 namespace VaghtNegar.Application.Appointments;
 
-public sealed record BookAppointmentRequest(Guid PatientId, DateTimeOffset StartsAtUtc, string? PatientNote);
+public sealed record BookAppointmentRequest(DateTimeOffset StartsAtUtc, string? PatientNote);
 public sealed record AppointmentBookingDto(
     Guid Id,
     Guid ClinicId,
