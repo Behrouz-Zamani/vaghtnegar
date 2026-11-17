@@ -11,7 +11,7 @@ public sealed class AppointmentBookingRepository(VaghtNegarDbContext db) : IAppo
 {
     public async Task<AppointmentBookingResult> TryBookAsync(
         Guid doctorId,
-        Guid patientId,
+        string identityUserId,
         DateTimeOffset startsAtUtc,
         DateTimeOffset endsAtUtc,
         string? patientNote,
@@ -29,10 +29,12 @@ public sealed class AppointmentBookingRepository(VaghtNegarDbContext db) : IAppo
             return new AppointmentBookingResult(AppointmentBookingFailure.DoctorNotFound, null);
         }
 
-        var patientExists = await db.Patients
-            .AnyAsync(x => x.Id == patientId && x.IsActive, cancellationToken);
+        var patient = await db.Patients
+            .FirstOrDefaultAsync(x =>
+                x.IdentityUserId == identityUserId && x.IsActive,
+                cancellationToken);
 
-        if (!patientExists)
+        if (patient is null)
         {
             await transaction.RollbackAsync(cancellationToken);
             return new AppointmentBookingResult(AppointmentBookingFailure.PatientNotFound, null);
@@ -52,7 +54,7 @@ public sealed class AppointmentBookingRepository(VaghtNegarDbContext db) : IAppo
         }
 
         var appointment = new Appointment(
-            doctor.ClinicId, doctorId, patientId, startsAtUtc, endsAtUtc, patientNote);
+            doctor.ClinicId, doctorId, patient.Id, startsAtUtc, endsAtUtc, patientNote);
 
         await db.Appointments.AddAsync(appointment, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
