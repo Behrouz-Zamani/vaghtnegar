@@ -51,6 +51,27 @@ public sealed class PatientService(IPatientRepository repository)
         return ToDto(patient);
     }
 
+    public async Task<PatientDto?> LinkIdentityAccountAsync(
+        Guid patientId,
+        string identityUserId,
+        bool mobileNumberVerifiedByStaff,
+        CancellationToken ct)
+    {
+        var patient = await repository.GetByIdAsync(patientId, ct);
+        if (patient is null) return null;
+
+        var normalizedIdentityUserId = identityUserId?.Trim();
+        if (string.IsNullOrWhiteSpace(normalizedIdentityUserId))
+            throw new ArgumentException("شناسه کاربر Keycloak الزامی است.", nameof(identityUserId));
+
+        if (await repository.IdentityUserIdExistsAsync(normalizedIdentityUserId, patientId, ct))
+            throw new PatientIdentityAlreadyLinkedException();
+
+        patient.LinkIdentityAccount(normalizedIdentityUserId, mobileNumberVerifiedByStaff);
+        await repository.SaveChangesAsync(ct);
+        return ToDto(patient);
+    }
+
     private static string NormalizeMobile(string mobileNumber) =>
         new((mobileNumber ?? string.Empty).Where(c => !char.IsWhiteSpace(c)).ToArray());
 
@@ -63,3 +84,6 @@ public sealed class PatientMobileAlreadyExistsException(string mobileNumber)
 {
     public string MobileNumber { get; } = mobileNumber;
 }
+
+public sealed class PatientIdentityAlreadyLinkedException()
+    : Exception("این حساب کاربری قبلاً به پرونده بیمار دیگری متصل شده است.");
