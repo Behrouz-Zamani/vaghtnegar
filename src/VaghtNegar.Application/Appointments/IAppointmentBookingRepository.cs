@@ -4,7 +4,7 @@ public interface IAppointmentBookingRepository
 {
     Task<AppointmentBookingResult> TryBookAsync(
         Guid doctorId,
-        Guid patientId,
+        string identityUserId,
         DateTimeOffset startsAtUtc,
         DateTimeOffset endsAtUtc,
         string? patientNote,
