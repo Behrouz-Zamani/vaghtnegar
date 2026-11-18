@@ -1,0 +1,56 @@
+@inherits LayoutComponentBase
+<div class="app-shell">
+    <aside class="sidebar">
+        <a class="brand" href="/">
+            <span class="brand-mark"><span></span><span></span><span></span></span>
+            <span><strong>وقت‌نگار</strong><small>سامانه هوشمند سلامت</small></span>
+        </a>
+        <div class="sidebar-caption">فضای کاری</div>
+        <NavMenu />
+        <div class="sidebar-bottom">
+            <div class="support-card">
+                <div class="support-icon">✚</div>
+                <strong>همراه شما هستیم</strong>
+                <p>برای راهنمایی و پشتیبانی با تیم وقت‌نگار در ارتباط باشید.</p>
+                <a href="mailto:support@vaghtnegar.local">ارتباط با پشتیبانی</a>
+            </div>
+            <div class="sidebar-version">VaghtNegar · نسخه ۱.۰</div>
+        </div>
+    </aside>
+
+    <main class="main-area">
+        <header class="topbar">
+            <div class="topbar-title">
+                <span class="live-dot"></span>
+                <span>سامانه مدیریت خدمات درمانی</span>
+            </div>
+            <div class="topbar-actions">
+                <span class="today-label">@PersianDate.Today</span>
+                <AuthorizeView>
+                    <Authorized Context="auth">
+                        <div class="user-chip">
+                            <span class="avatar">@Initial(auth.User.Identity?.Name)</span>
+                            <span class="user-name">@(!string.IsNullOrWhiteSpace(auth.User.Identity?.Name) ? auth.User.Identity!.Name : "کاربر")</span>
+                            <a class="logout-link" href="/account/logout" title="خروج">خروج</a>
+                        </div>
+                    </Authorized>
+                    <NotAuthorized>
+                        <a class="btn btn-primary btn-small" href="/account/login">ورود</a>
+                    </NotAuthorized>
+                </AuthorizeView>
+            </div>
+        </header>
+        <div class="page-content">
+            @Body
+        </div>
+        <footer class="page-footer">
+            <span>© @DateTime.Now.Year وقت‌نگار</span>
+            <span>مراقبت بهتر، مدیریت هوشمندتر</span>
+        </footer>
+    </main>
+</div>
+
+@code {
+    private static string Initial(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? "ک" : value.Trim()[0].ToString();
+}
