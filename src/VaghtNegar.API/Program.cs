@@ -180,6 +180,7 @@ app.MapPatientEndpoints();
 app.MapSchedulingEndpoints();
 app.MapAppointmentBookingEndpoints();
 app.MapAppointmentManagementEndpoints();
+app.MapPatientPortalEndpoints();
 
 app.Run();
 
