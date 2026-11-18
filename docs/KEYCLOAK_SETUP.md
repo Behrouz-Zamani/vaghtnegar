@@ -1,81 +1,54 @@
-# Keycloak setup for VaghtNegar
+# راه‌اندازی Keycloak برای وقت‌نگار
 
-## 1. Start Keycloak locally
+## ۱. اجرای محلی
+Keycloak را با نصب فعلی ویندوز اجرا کنید. آدرس کنسول مدیریت:
 
-From the repository root:
+- Admin: http://localhost:8080/admin/
+- Realm: http://localhost:8080/realms/vaghtnegar
 
-```powershell
-Copy-Item .env.example .env
-notepad .env
-docker compose up -d
-docker compose logs -f keycloak
-```
+Realm باید `vaghtnegar` و Client شناسه `vaghtnegar-web` از نوع Public باشد. Standard Flow روشن و PKCE method برابر `S256` باشد.
 
-Set unique passwords in `.env` before starting the containers. Never commit the real `.env` file.
-
-Wait until Keycloak has completed its startup. Open:
-
-- Admin console: http://localhost:8080/admin/
-- Realm issuer: http://localhost:8080/realms/vaghtnegar
-- OpenID discovery: http://localhost:8080/realms/vaghtnegar/.well-known/openid-configuration
-
-Sign in to the admin console with the bootstrap admin credentials from `.env`, then select the `vaghtnegar` realm.
-
-The realm import creates these realm roles:
-
+نقش‌های Realm مورد استفاده برنامه:
 - `Patient`
 - `Doctor`
 - `Receptionist`
 - `ClinicAdmin`
 - `SuperAdmin`
 
-It also creates the public OIDC client `vaghtnegar-web` with Authorization Code flow and PKCE S256, plus the `vaghtnegar-api` audience.
-
-## 2. Configure the API
-
-The API reads these settings from `appsettings.json` and supports environment-variable overrides:
-
-- `Keycloak__Authority`
-- `Keycloak__Audience`
-
-Local defaults:
-
+## ۲. تنظیم API
+تنظیمات پیش‌فرض API:
 - Authority: `http://localhost:8080/realms/vaghtnegar`
 - Audience: `vaghtnegar-api`
 
-For production, use the public HTTPS issuer URL and keep HTTPS metadata validation enabled. Do not expose Keycloak's development mode or its admin console publicly without a production deployment configuration.
+در محیط عملیاتی از Issuer مبتنی بر HTTPS استفاده کنید و حالت توسعه Keycloak را در معرض اینترنت قرار ندهید.
 
-The API validates signature, issuer, audience, and token lifetime using Keycloak's OpenID Connect discovery metadata. Realm roles are mapped to .NET role claims. The protected endpoint `GET /api/v1/auth/me` returns the authenticated subject, username, email, and roles.
+## ۳. تنظیم Client برای Swagger
+URIهای Swagger را نگه دارید:
+- Redirect: `https://localhost:7180/swagger/oauth2-redirect.html`
+- Web origin: `https://localhost:7180`
 
-## 3. Create a test user
+## ۴. تنظیم Client برای Blazor UI
+در همان Client با شناسه `vaghtnegar-web`، موارد زیر را به مقادیر فعلی اضافه کنید؛ URIهای Swagger را حذف نکنید:
 
-In the Keycloak admin console:
+- Valid redirect URIs: `https://localhost:7290/signin-oidc`
+- Valid post logout redirect URIs: `https://localhost:7290/signout-callback-oidc`
+- Web origins: `https://localhost:7290`
+- Client authentication: OFF (Public)
+- Standard flow: ON
+- PKCE method: S256
 
-1. Open the `vaghtnegar` realm.
-2. Go to Users and create a test user.
-3. Set a username and email; enable the account.
-4. Set a temporary password from the Credentials tab.
-5. Assign one realm role, such as `Patient`, from Role mapping.
+Blazor از OpenID Connect Authorization Code + PKCE استفاده می‌کند. Access Token در مرورگر در اختیار JavaScript قرار نمی‌گیرد؛ درخواست‌های API از Backend-for-Frontend سمت سرور عبور می‌کنند و توکن با نشست کاربر به API ارسال می‌شود.
 
-Self-registration is deliberately disabled in this first setup. Do not enable public patient registration until a verified mobile-number flow and safe patient-record linking have been implemented. Keycloak does not provide a ready-to-use SMS OTP provider out of the box.
+تنظیمات UI در `src/VaghtNegar.Web/appsettings.json` است:
+- `Keycloak:Authority`
+- `Keycloak:ClientId`
+- `Api:BaseUrl`
 
-## 4. Patient identity link migration
+## ۵. کاربر آزمایشی
+در Realm کاربر آزمایشی بسازید، حساب را فعال کنید، رمز عبور تعیین کنید و یکی از نقش‌های Realm را به او بدهید. برای ورود به پنل‌ها، نقش متناظر لازم است.
 
-The Patient entity now has a nullable `IdentityUserId` with a unique filtered index. Existing patients remain unlinked until their mobile number has been verified.
-
-After pulling the changes, create and apply the EF Core migration from the repository root:
-
-```powershell
-dotnet ef migrations add AddPatientIdentityUserId --project src/VaghtNegar.Infrastructure --startup-project src/VaghtNegar.API --output-dir Persistence/Migrations
-dotnet ef database update --project src/VaghtNegar.Infrastructure --startup-project src/VaghtNegar.API
-```
-
-The domain method `Patient.LinkIdentityAccount(identityUserId, mobileNumberVerified)` rejects linking unless the trusted application flow confirms mobile verification.
-
-## 5. Important security boundary
-
-This commit establishes JWT validation and the identity foundation. It does not yet change existing clinic, doctor, patient, scheduling, or appointment endpoint access rules. Do not treat those existing management endpoints as production-secure until role/clinic authorization is applied.
-
-Before enabling authenticated appointment booking, the API must resolve the patient's record from the authenticated `sub` claim and the verified identity link. It must not trust a client-supplied PatientId for self-service booking.
-
-For production, deploy Keycloak with HTTPS, a managed/persistent PostgreSQL database, backups, secrets management, and a non-development Keycloak start command.
+## ۶. ملاحظات امنیتی
+- ثبت‌نام عمومی تا زمان پیاده‌سازی تأیید شماره موبایل و اتصال امن پرونده بیمار غیرفعال بماند.
+- نقش‌های UI فقط برای نمایش و مسیریابی هستند؛ کنترل دسترسی نهایی باید در API اعمال شود.
+- Client و تنظیمات تولید باید با HTTPS، مدیریت امن Secretها و تنظیمات عملیاتی مناسب مستقر شوند.
+- توکن‌های کامل یا رمز عبور را در گفتگو، لاگ یا مخزن Git قرار ندهید.
