@@ -3,6 +3,7 @@ using VaghtNegar.Application.Appointments;
 using VaghtNegar.Application.Clinics;
 using VaghtNegar.Application.Doctors;
 using VaghtNegar.Application.Patients;
+using VaghtNegar.Application.PatientPortal;
 using VaghtNegar.Application.Scheduling;
 
 namespace VaghtNegar.Application;
@@ -17,6 +18,7 @@ public static class DependencyInjection
         services.AddScoped<SchedulingService>();
         services.AddScoped<AppointmentBookingService>();
         services.AddScoped<AppointmentManagementService>();
+        services.AddScoped<PatientPortalService>();
         return services;
     }
 }
