@@ -4,10 +4,13 @@ namespace VaghtNegar.API.Endpoints;
 
 public static class DoctorEndpoints
 {
+    private static readonly string[] AdminRoles = ["ClinicAdmin", "SuperAdmin"];
+
     public static IEndpointRouteBuilder MapDoctorEndpoints(this IEndpointRouteBuilder endpoints)
     {
         var group = endpoints.MapGroup("/api/v1/doctors").WithTags("Doctors");
 
+        // Public read endpoints are used by appointment discovery.
         group.MapGet("/", async (Guid? clinicId, DoctorService service, CancellationToken ct) =>
             Results.Ok(await service.GetAllAsync(clinicId, ct))).WithName("GetDoctors");
 
@@ -36,7 +39,9 @@ public static class DoctorEndpoints
             {
                 return Results.Conflict(new { message = "امکان ثبت پزشک در کلینیک غیرفعال وجود ندارد.", clinicId = ex.ClinicId });
             }
-        }).WithName("CreateDoctor");
+        })
+        .RequireAuthorization(policy => policy.RequireRole(AdminRoles))
+        .WithName("CreateDoctor");
 
         group.MapPut("/{id:guid}", async (Guid id, UpdateDoctorRequest request, DoctorService service, CancellationToken ct) =>
         {
@@ -44,13 +49,17 @@ public static class DoctorEndpoints
             if (errors is not null) return Results.ValidationProblem(errors);
             var doctor = await service.UpdateAsync(id, request.FirstName, request.LastName, request.MedicalCode, ct);
             return doctor is null ? Results.NotFound() : Results.Ok(doctor);
-        }).WithName("UpdateDoctor");
+        })
+        .RequireAuthorization(policy => policy.RequireRole(AdminRoles))
+        .WithName("UpdateDoctor");
 
         group.MapPatch("/{id:guid}/active", async (Guid id, SetDoctorActiveRequest request, DoctorService service, CancellationToken ct) =>
         {
             var doctor = await service.SetActiveAsync(id, request.IsActive, ct);
             return doctor is null ? Results.NotFound() : Results.Ok(doctor);
-        }).WithName("SetDoctorActive");
+        })
+        .RequireAuthorization(policy => policy.RequireRole(AdminRoles))
+        .WithName("SetDoctorActive");
 
         return endpoints;
     }
