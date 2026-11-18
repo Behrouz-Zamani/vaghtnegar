@@ -1,0 +1,14 @@
+@page "/patient"
+@attribute [Authorize(Roles = "Patient")]
+<PageTitle>پنل بیمار | وقت‌نگار</PageTitle>
+<section class="page-heading">
+    <span class="eyebrow">فضای اختصاصی بیمار</span>
+    <h1>پنل بیمار</h1>
+    <p class="page-lead">مدیریت نوبت‌ها و پیگیری خدمات درمانی شما.</p>
+</section>
+<div class="feature-grid">
+    <article class="feature-card"><span class="feature-icon pink">▦</span><h2>نوبت‌های من</h2><p>مشاهده و پیگیری نوبت‌های ثبت‌شده و وضعیت آن‌ها.</p><span class="feature-state">اتصال API در مرحله بعد</span></article>
+    <article class="feature-card"><span class="feature-icon teal">♡</span><h2>پرونده من</h2><p>مشاهده اطلاعات هویتی و اطلاعات تماس ثبت‌شده در کلینیک.</p><span class="feature-state">اتصال API در مرحله بعد</span></article>
+    <article class="feature-card"><span class="feature-icon blue">＋</span><h2>دریافت نوبت</h2><p>انتخاب کلینیک، پزشک، تاریخ شمسی و ساعت آزاد.</p><span class="feature-state">آماده اتصال به سرویس رزرو</span></article>
+</div>
+<div class="notice-card"><strong>نکته پیاده‌سازی</strong><p>برای تکمیل گردش کار بیمار، ابتدا باید endpointهای Patient Portal در API در دسترس و در Program ثبت شوند؛ این صفحه عمداً داده آزمایشی یا اطلاعات ساختگی نمایش نمی‌دهد.</p></div>
