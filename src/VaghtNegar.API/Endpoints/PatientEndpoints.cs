@@ -74,16 +74,10 @@ public static class PatientEndpoints
                     ["identityUserId"] = ["شناسه sub کاربر Keycloak الزامی است."]
                 });
 
-            if (!request.MobileNumberVerifiedByStaff)
-                return Results.BadRequest(new
-                {
-                    message = "اتصال حساب فقط پس از احراز شماره موبایل توسط کارمند مجاز است."
-                });
-
             try
             {
                 var patient = await service.LinkIdentityAccountAsync(
-                    id, request.IdentityUserId, request.MobileNumberVerifiedByStaff, ct);
+                    id, request.IdentityUserId, mobileNumberVerifiedByStaff: true, ct);
 
                 return patient is null
                     ? Results.NotFound(new { message = "پرونده بیمار یافت نشد." })
@@ -135,4 +129,4 @@ public static class PatientEndpoints
 
 public sealed record CreateOrUpdatePatientRequest(string FirstName, string LastName, string MobileNumber, DateOnly? BirthDate);
 public sealed record SetPatientActiveRequest(bool IsActive);
-public sealed record LinkPatientIdentityRequest(string IdentityUserId, bool MobileNumberVerifiedByStaff);
+public sealed record LinkPatientIdentityRequest(string IdentityUserId);
