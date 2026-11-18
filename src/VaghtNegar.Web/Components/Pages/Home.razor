@@ -1,0 +1,109 @@
+@page "/"
+@attribute [Authorize]
+@inject VaghtNegarApiClient ApiClient
+
+<PageTitle>داشبورد | وقت‌نگار</PageTitle>
+
+<section class="welcome-row">
+    <div>
+        <span class="eyebrow">داشبورد مدیریتی</span>
+        <h1>سلام، خوش آمدید <span class="welcome-wave">✦</span></h1>
+        <p class="page-lead">از اینجا می‌توانید بخش‌های مختلف سامانه وقت‌نگار را مدیریت کنید.</p>
+    </div>
+    <div class="welcome-date">
+        <span class="date-icon">▦</span>
+        <span><small>امروز</small><strong>@PersianDate.Today</strong></span>
+    </div>
+</section>
+
+<AuthorizeView Roles="Receptionist,ClinicAdmin,SuperAdmin">
+    <div class="stats-grid">
+        <article class="stat-card">
+            <div class="stat-icon teal">✚</div>
+            <div><span>کلینیک‌های ثبت‌شده</span><strong>@(summary?.ClinicCount.ToString("N0") ?? "—")</strong><small>اطلاعات دریافتی از API</small></div>
+        </article>
+        <article class="stat-card">
+            <div class="stat-icon blue">⚕</div>
+            <div><span>پزشکان</span><strong>@(summary?.DoctorCount.ToString("N0") ?? "—")</strong><small>پزشکان قابل مشاهده</small></div>
+        </article>
+        <article class="stat-card">
+            <div class="stat-icon violet">▤</div>
+            <div><span>وضعیت سامانه</span><strong class="status-online">متصل</strong><small>ارتباط با سرویس وقت‌نگار</small></div>
+        </article>
+    </div>
+</AuthorizeView>
+
+<section class="content-grid">
+    <div class="panel-card">
+        <div class="panel-heading">
+            <div><span class="eyebrow">دسترسی سریع</span><h2>بخش‌های سامانه</h2></div>
+            <span class="heading-symbol">✧</span>
+        </div>
+        <div class="quick-links">
+            <AuthorizeView Roles="Patient">
+                <a class="quick-link" href="/patient"><span class="quick-icon pink">♡</span><span><strong>پنل بیمار</strong><small>نوبت‌ها و اطلاعات شخصی</small></span><b>←</b></a>
+            </AuthorizeView>
+            <AuthorizeView Roles="Doctor">
+                <a class="quick-link" href="/doctor"><span class="quick-icon blue">⚕</span><span><strong>پنل پزشک</strong><small>برنامه کاری و مراجعات</small></span><b>←</b></a>
+            </AuthorizeView>
+            <AuthorizeView Roles="Receptionist,ClinicAdmin,SuperAdmin">
+                <a class="quick-link" href="/reception"><span class="quick-icon teal">▤</span><span><strong>پذیرش و نوبت‌ها</strong><small>مدیریت مراجعه‌کنندگان</small></span><b>←</b></a>
+            </AuthorizeView>
+            <AuthorizeView Roles="ClinicAdmin,SuperAdmin">
+                <a class="quick-link" href="/admin"><span class="quick-icon violet">⚙</span><span><strong>مدیریت کلینیک</strong><small>پزشکان و مراکز درمانی</small></span><b>←</b></a>
+            </AuthorizeView>
+        </div>
+    </div>
+
+    <div class="panel-card highlight-panel">
+        <div class="highlight-orb orb-one"></div><div class="highlight-orb orb-two"></div>
+        <span class="eyebrow">VaghtNegar Care</span>
+        <h2>تجربه‌ای ساده‌تر برای مراقبت بهتر</h2>
+        <p>مدیریت یکپارچه نوبت‌ها، پزشکان و خدمات کلینیک؛ در یک فضای امن و فارسی.</p>
+        <div class="highlight-footer"><span>طراحی‌شده برای مراکز درمانی</span><span class="plus-mark">＋</span></div>
+    </div>
+</section>
+
+<AuthorizeView Roles="Receptionist,ClinicAdmin,SuperAdmin">
+    <section class="panel-card table-panel">
+        <div class="panel-heading">
+            <div><span class="eyebrow">عملیات روزانه</span><h2>آخرین نوبت‌ها</h2></div>
+            <a href="/reception" class="text-link">مشاهده همه ←</a>
+        </div>
+        @if (appointmentsLoading)
+        {
+            <div class="loading-line"><span></span> در حال دریافت اطلاعات نوبت‌ها...</div>
+        }
+        else if (appointmentResult is { Succeeded: true, Appointments.Count: > 0 })
+        {
+            <div class="table-wrap">
+                <table>
+                    <thead><tr><th>پزشک</th><th>بیمار</th><th>ساعت</th><th>وضعیت</th></tr></thead>
+                    <tbody>
+                        @foreach (var appointment in appointmentResult.Appointments)
+                        {
+                            <tr><td>@appointment.Doctor</td><td>@appointment.Patient</td><td class="time-cell">@appointment.Time</td><td><span class="soft-status">@appointment.Status</span></td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        else
+        {
+            <div class="empty-inline">@(appointmentResult?.Error ?? "هنوز نوبتی برای نمایش وجود ندارد.")</div>
+        }
+    </section>
+</AuthorizeView>
+
+@code {
+    private ApiDashboardSummary? summary;
+    private ApiCallResult? appointmentResult;
+    private bool appointmentsLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        summary = await ApiClient.GetDashboardSummaryAsync();
+        appointmentResult = await ApiClient.GetAppointmentsAsync();
+        appointmentsLoading = false;
+    }
+}
