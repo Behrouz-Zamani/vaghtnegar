@@ -4,9 +4,14 @@ namespace VaghtNegar.API.Endpoints;
 
 public static class AppointmentManagementEndpoints
 {
+    private static readonly string[] AppointmentStaffRoles = ["Receptionist", "ClinicAdmin", "SuperAdmin"];
+
     public static IEndpointRouteBuilder MapAppointmentManagementEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        var group = endpoints.MapGroup("/api/v1/appointments").WithTags("Appointments");
+        // Appointment details include patient name, mobile number and clinical notes.
+        var group = endpoints.MapGroup("/api/v1/appointments")
+            .WithTags("Appointments")
+            .RequireAuthorization(policy => policy.RequireRole(AppointmentStaffRoles));
 
         group.MapGet("", async (
             Guid? doctorId,
@@ -54,10 +59,10 @@ public static class AppointmentManagementEndpoints
         .WithName("GetAppointmentById")
         .WithSummary("جزئیات یک نوبت");
 
-        MapStatusAction(group, "confirm", "ConfirmAppointment", "تأیید نوبت", "تأیید");
-        MapStatusAction(group, "cancel", "CancelAppointment", "لغو نوبت", "لغو");
-        MapStatusAction(group, "complete", "CompleteAppointment", "ثبت انجام نوبت", "تکمیل");
-        MapStatusAction(group, "no-show", "MarkAppointmentNoShow", "ثبت عدم مراجعه بیمار", "عدم مراجعه");
+        MapStatusAction(group, "confirm", "ConfirmAppointment", "تأیید نوبت");
+        MapStatusAction(group, "cancel", "CancelAppointment", "لغو نوبت");
+        MapStatusAction(group, "complete", "CompleteAppointment", "ثبت انجام نوبت");
+        MapStatusAction(group, "no-show", "MarkAppointmentNoShow", "ثبت عدم مراجعه بیمار");
 
         return endpoints;
     }
@@ -66,8 +71,7 @@ public static class AppointmentManagementEndpoints
         RouteGroupBuilder group,
         string action,
         string name,
-        string summary,
-        string actionLabel)
+        string summary)
     {
         group.MapPatch("/{id:guid}/" + action, async Task<IResult> (
             Guid id,
