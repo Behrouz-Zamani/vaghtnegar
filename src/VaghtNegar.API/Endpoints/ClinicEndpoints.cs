@@ -4,10 +4,13 @@ namespace VaghtNegar.API.Endpoints;
 
 public static class ClinicEndpoints
 {
+    private static readonly string[] AdminRoles = ["ClinicAdmin", "SuperAdmin"];
+
     public static IEndpointRouteBuilder MapClinicEndpoints(this IEndpointRouteBuilder endpoints)
     {
         var group = endpoints.MapGroup("/api/v1/clinics").WithTags("Clinics");
 
+        // Public read endpoints are used by appointment discovery.
         group.MapGet("/", async (ClinicService service, CancellationToken ct) =>
             Results.Ok(await service.GetAllAsync(ct)))
             .WithName("GetClinics");
@@ -31,7 +34,9 @@ public static class ClinicEndpoints
             {
                 return Results.Conflict(new { message = ex.Message, slug = ex.Slug });
             }
-        }).WithName("CreateClinic");
+        })
+        .RequireAuthorization(policy => policy.RequireRole(AdminRoles))
+        .WithName("CreateClinic");
 
         group.MapPut("/{id:guid}", async (Guid id, CreateOrUpdateClinicRequest request, ClinicService service, CancellationToken ct) =>
         {
@@ -46,13 +51,17 @@ public static class ClinicEndpoints
             {
                 return Results.Conflict(new { message = ex.Message, slug = ex.Slug });
             }
-        }).WithName("UpdateClinic");
+        })
+        .RequireAuthorization(policy => policy.RequireRole(AdminRoles))
+        .WithName("UpdateClinic");
 
         group.MapPatch("/{id:guid}/active", async (Guid id, SetClinicActiveRequest request, ClinicService service, CancellationToken ct) =>
         {
             var clinic = await service.SetActiveAsync(id, request.IsActive, ct);
             return clinic is null ? Results.NotFound() : Results.Ok(clinic);
-        }).WithName("SetClinicActive");
+        })
+        .RequireAuthorization(policy => policy.RequireRole(AdminRoles))
+        .WithName("SetClinicActive");
 
         return endpoints;
     }
