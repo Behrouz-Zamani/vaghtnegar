@@ -4,9 +4,15 @@ namespace VaghtNegar.API.Endpoints;
 
 public static class PatientEndpoints
 {
+    private static readonly string[] PatientStaffRoles = ["Receptionist", "ClinicAdmin", "SuperAdmin"];
+
     public static IEndpointRouteBuilder MapPatientEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        var group = endpoints.MapGroup("/api/v1/patients").WithTags("Patients");
+        // Patient records contain personally identifiable information. Until a patient-self
+        // endpoint is implemented, all patient CRUD and identity-link operations are staff-only.
+        var group = endpoints.MapGroup("/api/v1/patients")
+            .WithTags("Patients")
+            .RequireAuthorization(policy => policy.RequireRole(PatientStaffRoles));
 
         group.MapGet("/", async (string? search, PatientService service, CancellationToken ct) =>
             Results.Ok(await service.GetAllAsync(search, ct)))
@@ -102,7 +108,6 @@ public static class PatientEndpoints
                 return Results.BadRequest(new { message = ex.Message });
             }
         })
-        .RequireAuthorization(policy => policy.RequireRole("Receptionist", "ClinicAdmin", "SuperAdmin"))
         .WithName("LinkPatientIdentity")
         .WithSummary("اتصال پرونده بیمار به sub حساب Keycloak پس از احراز شماره موبایل توسط کارمند مجاز.");
 
