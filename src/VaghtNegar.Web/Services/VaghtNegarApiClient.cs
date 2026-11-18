@@ -1,12 +1,17 @@
 using System.Net;
-using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.AspNetCore.Components;
 
 namespace VaghtNegar.Web.Services;
 
-public sealed class VaghtNegarApiClient(IHttpClientFactory httpClientFactory)
+public sealed class VaghtNegarApiClient(IHttpClientFactory httpClientFactory, NavigationManager navigationManager)
 {
-    private readonly HttpClient _http = httpClientFactory.CreateClient("VaghtNegarApi");
+    // Browser-facing requests target the Blazor host's same-origin BFF, not the API directly.
+    private readonly HttpClient _http = new()
+    {
+        BaseAddress = new Uri(navigationManager.BaseUri),
+        Timeout = TimeSpan.FromSeconds(30)
+    };
 
     public async Task<ApiDashboardSummary> GetDashboardSummaryAsync(CancellationToken cancellationToken = default)
     {
