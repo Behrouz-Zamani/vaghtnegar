@@ -5,11 +5,13 @@ using VaghtNegar.Application.Appointments;
 using VaghtNegar.Application.Clinics;
 using VaghtNegar.Application.Doctors;
 using VaghtNegar.Application.Patients;
+using VaghtNegar.Application.PatientPortal;
 using VaghtNegar.Application.Scheduling;
 using VaghtNegar.Infrastructure.Appointments;
 using VaghtNegar.Infrastructure.Clinics;
 using VaghtNegar.Infrastructure.Doctors;
 using VaghtNegar.Infrastructure.Patients;
+using VaghtNegar.Infrastructure.PatientPortal;
 using VaghtNegar.Infrastructure.Scheduling;
 using VaghtNegar.Infrastructure.Persistence;
 
@@ -29,6 +31,7 @@ public static class DependencyInjection
         services.AddScoped<ISchedulingRepository, SchedulingRepository>();
         services.AddScoped<IAppointmentBookingRepository, AppointmentBookingRepository>();
         services.AddScoped<IAppointmentManagementRepository, AppointmentManagementRepository>();
+        services.AddScoped<IPatientPortalRepository, PatientPortalRepository>();
         return services;
     }
 }
