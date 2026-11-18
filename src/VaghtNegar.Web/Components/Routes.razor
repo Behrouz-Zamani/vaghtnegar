@@ -1,0 +1,26 @@
+<Router AppAssembly="typeof(Program).Assembly">
+    <Found Context="routeData">
+        <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(MainLayout)">
+            <NotAuthorized>
+                <LayoutView Layout="typeof(MainLayout)">
+                    <section class="auth-required">
+                        <div class="auth-icon">⌑</div>
+                        <h1>برای مشاهده این بخش وارد شوید</h1>
+                        <p>برای دسترسی به امکانات وقت‌نگار، با حساب کاربری خود از طریق سامانه امن ورود اقدام کنید.</p>
+                        <a class="btn btn-primary" href="/account/login">ورود به وقت‌نگار</a>
+                    </section>
+                </LayoutView>
+            </NotAuthorized>
+        </AuthorizeRouteView>
+        <FocusOnNavigate RouteData="routeData" Selector="h1" />
+    </Found>
+    <NotFound>
+        <LayoutView Layout="typeof(MainLayout)">
+            <section class="empty-state">
+                <span class="eyebrow">خطای ۴۰۴</span>
+                <h1>صفحه موردنظر پیدا نشد</h1>
+                <a class="btn btn-primary" href="/">بازگشت به داشبورد</a>
+            </section>
+        </LayoutView>
+    </NotFound>
+</Router>
