@@ -133,7 +133,7 @@ app.MapGet("/account/logout", async (HttpContext context) =>
 
 // A fixed-origin backend-for-frontend proxy. The destination host is configured by the server,
 // never supplied by the browser. API authorization remains enforced by the API itself.
-app.MapMethods("/bff/{**path}", ["GET", "POST", "PUT", "PATCH", "DELETE"], async (
+app.MapMethods("/bff/{**path}", ["GET"], async (
     HttpContext context,
     IHttpClientFactory clients,
     string? path,
