@@ -5,24 +5,34 @@
 ## چشم‌انداز
 وقت‌نگار بستری برای مدیریت کلینیک، پزشکان، تخصص‌ها، برنامه کاری، نوبت‌ها، بیماران، پرداخت‌ها و پیگیری مراجعات است.
 
-## تصمیم‌های پایه
-- نوع محصول: Clinic
-- Backend: ASP.NET Core Web API
-- Architecture: Clean Architecture
+## فناوری و معماری
+- Backend: ASP.NET Core Web API و Clean Architecture
+- Frontend: Blazor Web App (.NET 10، Interactive Server)
 - Database: SQL Server با Entity Framework Core
-- API Documentation: OpenAPI
-- Payments: پشتیبانی از پرداخت آنلاین و پرداخت حضوری
-- زبان و منطقه زمانی: قابل پیکربندی؛ تاریخ‌های نمایشی فارسی در لایه رابط کاربری
+- Identity: Keycloak، OpenID Connect و PKCE
+- UI: فارسی، RTL و نمایش تاریخ شمسی
+- API Documentation: OpenAPI و Swagger
 
 ## ساختار راهکار
 - `src/VaghtNegar.Domain`: مدل دامنه و قواعد کسب‌وکار
 - `src/VaghtNegar.Application`: سناریوها، قراردادها و اعتبارسنجی
 - `src/VaghtNegar.Infrastructure`: پایگاه داده و سرویس‌های بیرونی
 - `src/VaghtNegar.API`: نقطه ورود HTTP و پیکربندی برنامه
+- `src/VaghtNegar.Web`: رابط کاربری Blazor و پنل‌های نقش‌محور
 - `tests/`: آزمون‌های واحد و یکپارچه
 
-## وضعیت توسعه
-در حال آماده‌سازی اسکلت اولیه و تصمیم‌های معماری هستیم. جزئیات هر قابلیت در مستندات پروژه ثبت می‌شود.
+## اجرای رابط کاربری
+پیش‌نیاز: .NET SDK 10، API روی `https://localhost:7180` و Keycloak روی `http://localhost:8080`.
 
-## شروع توسعه
-پس از ایجاد Solution و پروژه‌ها، دستورهای اجرا و Migration در همین فایل تکمیل خواهند شد.
+از ریشه مخزن اجرا کنید:
+
+```powershell
+dotnet restore src/VaghtNegar.Web/VaghtNegar.Web.csproj
+dotnet dev-certs https --trust
+dotnet run --project src/VaghtNegar.Web/VaghtNegar.Web.csproj
+```
+
+آدرس پیش‌فرض UI: `https://localhost:7290`. راهنمای تنظیم Client در [راهنمای Keycloak](docs/KEYCLOAK_SETUP.md) و [راهنمای UI](src/VaghtNegar.Web/README.md) آمده است.
+
+## وضعیت توسعه UI
+اسکلت مشترک و صفحات نقش‌محور بیمار، پزشک، پذیرش و مدیریت ثبت شده‌اند. داشبورد و فهرست‌های کلینیک/پزشک/نوبت از API خوانده می‌شوند. تکمیل فرم‌های CRUD، تقویم انتخاب تاریخ شمسی، گردش کار رزرو و APIهای اختصاصی پزشک و بیمار در مراحل بعدی انجام می‌شود.
