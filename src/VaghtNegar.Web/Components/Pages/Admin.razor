@@ -1,33 +1,244 @@
 @page "/admin"
 @attribute [Authorize(Roles = "ClinicAdmin,SuperAdmin")]
 @inject VaghtNegarApiClient ApiClient
+
 <PageTitle>مدیریت کلینیک | وقت‌نگار</PageTitle>
-<section class="page-heading"><span class="eyebrow">مرکز کنترل</span><h1>مدیریت کلینیک</h1><p class="page-lead">مدیریت مراکز درمانی، پزشکان و تنظیمات سامانه.</p></section>
-@if (loading) { <div class="panel-card loading-line"><span></span> در حال دریافت اطلاعات کلینیک...</div> }
-else {
+
+<section class="page-heading">
+    <span class="eyebrow">مرکز کنترل</span>
+    <h1>مدیریت کلینیک</h1>
+    <p class="page-lead">مدیریت مراکز درمانی و کادر پزشکی؛ اطلاعات مستقیماً از API دریافت می‌شود.</p>
+</section>
+
+@if (!string.IsNullOrWhiteSpace(feedback))
+{
+    <div class="admin-feedback @(feedbackIsError ? "error" : "success")" role="status">@feedback</div>
+}
+
 <div class="stats-grid">
-    <article class="stat-card"><div class="stat-icon teal">✚</div><div><span>کلینیک‌ها</span><strong>@(summary?.ClinicCount ?? 0)</strong><small>از API کلینیک‌ها</small></div></article>
-    <article class="stat-card"><div class="stat-icon blue">⚕</div><div><span>پزشکان</span><strong>@(summary?.DoctorCount ?? 0)</strong><small>از API پزشکان</small></div></article>
+    <article class="stat-card"><div class="stat-icon teal">✚</div><div><span>کلینیک‌ها</span><strong>@clinics.Count</strong><small>@clinics.Count(x => x.IsActive) مرکز فعال</small></div></article>
+    <article class="stat-card"><div class="stat-icon blue">⚕</div><div><span>پزشکان</span><strong>@doctors.Count</strong><small>@doctors.Count(x => x.IsActive) پزشک فعال</small></div></article>
+    <article class="stat-card"><div class="stat-icon violet">▦</div><div><span>آخرین بروزرسانی</span><strong class="admin-date">@PersianDate.Today</strong><small>اطلاعات سامانه</small></div></article>
 </div>
-<section class="content-grid admin-lists">
-    <div class="panel-card"><div class="panel-heading"><div><span class="eyebrow">مراکز درمانی</span><h2>کلینیک‌ها</h2></div></div>
-        @if (summary?.Clinics.Count > 0) { <ul class="simple-list">@foreach (var item in summary.Clinics) { <li><span class="list-bullet teal-bullet"></span>@item</li> }</ul> } else { <div class="empty-inline">اطلاعاتی برای نمایش دریافت نشد.</div> }
-    </div>
-    <div class="panel-card"><div class="panel-heading"><div><span class="eyebrow">کادر درمان</span><h2>پزشکان</h2></div></div>
-        @if (summary?.Doctors.Count > 0) { <ul class="simple-list">@foreach (var item in summary.Doctors) { <li><span class="list-bullet blue-bullet"></span>@item</li> }</ul> } else { <div class="empty-inline">اطلاعاتی برای نمایش دریافت نشد.</div> }
-    </div>
-</section>}
-<div class="notice-card"><strong>قابلیت‌های مدیریتی</strong><p>CRUD کامل کلینیک و پزشک، مدیریت نقش‌ها، ساعت کاری، تعطیلات و تنظیمات پرداخت در گام‌های بعدی به پنل متصل خواهند شد.</p></div>
+
+@if (loading)
+{
+    <div class="panel-card loading-line"><span></span> در حال دریافت اطلاعات...</div>
+}
+else
+{
+    <section class="panel-card admin-section">
+        <div class="panel-heading">
+            <div><span class="eyebrow">مراکز درمانی</span><h2>مدیریت کلینیک‌ها</h2></div>
+            <button class="btn btn-primary" @onclick="NewClinic">＋ افزودن کلینیک</button>
+        </div>
+        @if (clinicEditorOpen)
+        {
+            <div class="admin-editor">
+                <h3>@(editingClinicId.HasValue ? "ویرایش کلینیک" : "ثبت کلینیک جدید")</h3>
+                <div class="admin-form-grid">
+                    <label>نام کلینیک<input class="admin-input" @bind="clinicName" maxlength="200" placeholder="مثلاً کلینیک مهر" /></label>
+                    <label>شناسه یکتا (Slug)<input class="admin-input" @bind="clinicSlug" maxlength="120" dir="ltr" placeholder="mehr-clinic" /></label>
+                </div>
+                <div class="admin-form-actions">
+                    <button class="btn btn-primary" disabled="@saving" @onclick="SaveClinicAsync">@(saving ? "در حال ذخیره..." : "ذخیره")</button>
+                    <button class="btn btn-outline" disabled="@saving" @onclick="CloseEditor">انصراف</button>
+                </div>
+            </div>
+        }
+        @if (clinics.Count == 0)
+        {
+            <div class="empty-inline">کلینیکی ثبت نشده است. برای شروع، یک کلینیک اضافه کنید.</div>
+        }
+        else
+        {
+            <div class="table-wrap"><table>
+                <thead><tr><th>نام کلینیک</th><th>شناسه</th><th>وضعیت</th><th>عملیات</th></tr></thead>
+                <tbody>
+                    @foreach (var clinic in clinics)
+                    {
+                        <tr>
+                            <td>@clinic.Name</td><td dir="ltr">@clinic.Slug</td>
+                            <td><span class="admin-status @(clinic.IsActive ? "active" : "inactive")">@(clinic.IsActive ? "فعال" : "غیرفعال")</span></td>
+                            <td class="admin-actions">
+                                <button class="btn btn-outline btn-small" @onclick="() => EditClinic(clinic)">ویرایش</button>
+                                <button class="btn btn-small @(clinic.IsActive ? "btn-danger-soft" : "btn-outline")" disabled="@saving" @onclick="() => ToggleClinicAsync(clinic)">@(clinic.IsActive ? "غیرفعال‌سازی" : "فعال‌سازی")</button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table></div>
+        }
+    </section>
+
+    <section class="panel-card admin-section">
+        <div class="panel-heading">
+            <div><span class="eyebrow">کادر درمان</span><h2>مدیریت پزشکان</h2></div>
+            <button class="btn btn-primary" disabled="@(clinics.All(x => !x.IsActive))" @onclick="NewDoctor">＋ افزودن پزشک</button>
+        </div>
+        @if (doctorEditorOpen)
+        {
+            <div class="admin-editor">
+                <h3>@(editingDoctorId.HasValue ? "ویرایش اطلاعات پزشک" : "ثبت پزشک جدید")</h3>
+                <div class="admin-form-grid">
+                    <label>نام<input class="admin-input" @bind="doctorFirstName" maxlength="100" /></label>
+                    <label>نام خانوادگی<input class="admin-input" @bind="doctorLastName" maxlength="100" /></label>
+                    <label>کد نظام پزشکی<input class="admin-input" @bind="doctorMedicalCode" maxlength="50" /></label>
+                    @if (!editingDoctorId.HasValue)
+                    {
+                        <label>کلینیک
+                            <select class="admin-input" @bind="doctorClinicId">
+                                <option value="">انتخاب کلینیک</option>
+                                @foreach (var clinic in clinics.Where(x => x.IsActive))
+                                {
+                                    <option value="@clinic.Id">@clinic.Name</option>
+                                }
+                            </select>
+                        </label>
+                    }
+                </div>
+                <div class="admin-form-actions">
+                    <button class="btn btn-primary" disabled="@saving" @onclick="SaveDoctorAsync">@(saving ? "در حال ذخیره..." : "ذخیره")</button>
+                    <button class="btn btn-outline" disabled="@saving" @onclick="CloseEditor">انصراف</button>
+                </div>
+            </div>
+        }
+        @if (doctors.Count == 0)
+        {
+            <div class="empty-inline">پزشکی ثبت نشده است.</div>
+        }
+        else
+        {
+            <div class="table-wrap"><table>
+                <thead><tr><th>نام پزشک</th><th>کد نظام پزشکی</th><th>کلینیک</th><th>وضعیت</th><th>عملیات</th></tr></thead>
+                <tbody>
+                    @foreach (var doctor in doctors)
+                    {
+                        <tr>
+                            <td>@doctor.FirstName @doctor.LastName</td><td>@(doctor.MedicalCode ?? "—")</td>
+                            <td>@(clinics.FirstOrDefault(x => x.Id == doctor.ClinicId)?.Name ?? "—")</td>
+                            <td><span class="admin-status @(doctor.IsActive ? "active" : "inactive")">@(doctor.IsActive ? "فعال" : "غیرفعال")</span></td>
+                            <td class="admin-actions">
+                                <button class="btn btn-outline btn-small" @onclick="() => EditDoctor(doctor)">ویرایش</button>
+                                <button class="btn btn-small @(doctor.IsActive ? "btn-danger-soft" : "btn-outline")" disabled="@saving" @onclick="() => ToggleDoctorAsync(doctor)">@(doctor.IsActive ? "غیرفعال‌سازی" : "فعال‌سازی")</button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table></div>
+        }
+    </section>
+}
+
 @code {
-    private ApiDashboardSummary? summary;
+    private List<AdminClinicItem> clinics = [];
+    private List<AdminDoctorItem> doctors = [];
     private bool loading = true;
-    private bool loaded;
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+    private bool saving;
+    private bool clinicEditorOpen;
+    private bool doctorEditorOpen;
+    private bool feedbackIsError;
+    private string? feedback;
+    private Guid? editingClinicId;
+    private Guid? editingDoctorId;
+    private string clinicName = "";
+    private string clinicSlug = "";
+    private string doctorFirstName = "";
+    private string doctorLastName = "";
+    private string doctorMedicalCode = "";
+    private string doctorClinicId = "";
+
+    protected override async Task OnInitializedAsync() => await ReloadAsync();
+
+    private async Task ReloadAsync()
     {
-        if (!firstRender || loaded) return;
-        loaded = true;
-        summary = await ApiClient.GetDashboardSummaryAsync();
+        loading = true;
+        var clinicTask = ApiClient.GetClinicsAsync();
+        var doctorTask = ApiClient.GetDoctorsAsync();
+        await Task.WhenAll(clinicTask, doctorTask);
+        clinics = await clinicTask;
+        doctors = await doctorTask;
         loading = false;
-        StateHasChanged();
     }
+
+    private void NewClinic()
+    {
+        editingClinicId = null; clinicName = ""; clinicSlug = "";
+        clinicEditorOpen = true; doctorEditorOpen = false; feedback = null;
+    }
+
+    private void EditClinic(AdminClinicItem clinic)
+    {
+        editingClinicId = clinic.Id; clinicName = clinic.Name; clinicSlug = clinic.Slug;
+        clinicEditorOpen = true; doctorEditorOpen = false; feedback = null;
+    }
+
+    private void NewDoctor()
+    {
+        editingDoctorId = null; doctorFirstName = ""; doctorLastName = "";
+        doctorMedicalCode = ""; doctorClinicId = clinics.First(x => x.IsActive).Id.ToString();
+        doctorEditorOpen = true; clinicEditorOpen = false; feedback = null;
+    }
+
+    private void EditDoctor(AdminDoctorItem doctor)
+    {
+        editingDoctorId = doctor.Id; doctorFirstName = doctor.FirstName; doctorLastName = doctor.LastName;
+        doctorMedicalCode = doctor.MedicalCode ?? ""; doctorClinicId = doctor.ClinicId.ToString();
+        doctorEditorOpen = true; clinicEditorOpen = false; feedback = null;
+    }
+
+    private void CloseEditor() { clinicEditorOpen = false; doctorEditorOpen = false; }
+
+    private async Task SaveClinicAsync()
+    {
+        if (string.IsNullOrWhiteSpace(clinicName) || string.IsNullOrWhiteSpace(clinicSlug))
+        { ShowFeedback("نام و شناسه یکتای کلینیک الزامی است.", true); return; }
+        saving = true;
+        var result = editingClinicId is Guid id
+            ? await ApiClient.UpdateClinicAsync(id, clinicName.Trim(), clinicSlug.Trim())
+            : await ApiClient.CreateClinicAsync(clinicName.Trim(), clinicSlug.Trim());
+        saving = false;
+        if (!result.Succeeded) { ShowFeedback(result.Message, true); return; }
+        CloseEditor(); await ReloadAsync(); ShowFeedback(result.Message, false);
+    }
+
+    private async Task ToggleClinicAsync(AdminClinicItem clinic)
+    {
+        saving = true;
+        var result = await ApiClient.SetClinicActiveAsync(clinic.Id, !clinic.IsActive);
+        saving = false;
+        if (!result.Succeeded) { ShowFeedback(result.Message, true); return; }
+        await ReloadAsync(); ShowFeedback(result.Message, false);
+    }
+
+    private async Task SaveDoctorAsync()
+    {
+        if (string.IsNullOrWhiteSpace(doctorFirstName) || string.IsNullOrWhiteSpace(doctorLastName))
+        { ShowFeedback("نام و نام خانوادگی پزشک الزامی است.", true); return; }
+        saving = true;
+        AdminMutationResult result;
+        if (editingDoctorId is Guid id)
+            result = await ApiClient.UpdateDoctorAsync(id, doctorFirstName.Trim(), doctorLastName.Trim(), NullIfEmpty(doctorMedicalCode));
+        else if (Guid.TryParse(doctorClinicId, out var clinicId))
+            result = await ApiClient.CreateDoctorAsync(clinicId, doctorFirstName.Trim(), doctorLastName.Trim(), NullIfEmpty(doctorMedicalCode));
+        else
+        {
+            saving = false; ShowFeedback("کلینیک پزشک را انتخاب کنید.", true); return;
+        }
+        saving = false;
+        if (!result.Succeeded) { ShowFeedback(result.Message, true); return; }
+        CloseEditor(); await ReloadAsync(); ShowFeedback(result.Message, false);
+    }
+
+    private async Task ToggleDoctorAsync(AdminDoctorItem doctor)
+    {
+        saving = true;
+        var result = await ApiClient.SetDoctorActiveAsync(doctor.Id, !doctor.IsActive);
+        saving = false;
+        if (!result.Succeeded) { ShowFeedback(result.Message, true); return; }
+        await ReloadAsync(); ShowFeedback(result.Message, false);
+    }
+
+    private void ShowFeedback(string message, bool isError) { feedback = message; feedbackIsError = isError; }
+    private static string? NullIfEmpty(string value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }
