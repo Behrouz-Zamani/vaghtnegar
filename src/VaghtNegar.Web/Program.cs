@@ -49,6 +49,11 @@ builder.Services
         options.ClientId = keycloakClientId;
         options.ResponseType = "code";
         options.UsePkce = true;
+        // Keycloak local development can reject PAR requests before processing the
+        // registered redirect URI. Keep PKCE enabled and bypass PAR in Development.
+        options.PushedAuthorizationBehavior = builder.Environment.IsDevelopment()
+            ? PushedAuthorizationBehavior.Disable
+            : PushedAuthorizationBehavior.UseIfAvailable;
         options.SaveTokens = true;
         options.GetClaimsFromUserInfoEndpoint = true;
         options.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
