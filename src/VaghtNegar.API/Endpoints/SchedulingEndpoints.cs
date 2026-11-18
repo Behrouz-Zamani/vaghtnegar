@@ -4,6 +4,8 @@ namespace VaghtNegar.API.Endpoints;
 
 public static class SchedulingEndpoints
 {
+    private static readonly string[] AdminRoles = ["ClinicAdmin", "SuperAdmin"];
+
     public static IEndpointRouteBuilder MapSchedulingEndpoints(this IEndpointRouteBuilder endpoints)
     {
         var group = endpoints.MapGroup("/api/v1/doctors/{doctorId:guid}/schedule").WithTags("Doctor Scheduling");
@@ -19,7 +21,9 @@ public static class SchedulingEndpoints
             try { return Results.Ok(await service.ReplaceWorkingHoursAsync(doctorId, request.Items ?? [], ct)); }
             catch (DoctorForScheduleNotFoundException ex) { return Results.NotFound(new { message = ex.Message }); }
             catch (ArgumentException ex) { return Results.ValidationProblem(new Dictionary<string, string[]> { ["schedule"] = [ex.Message] }); }
-        }).WithName("ReplaceDoctorWorkingHours");
+        })
+        .RequireAuthorization(policy => policy.RequireRole(AdminRoles))
+        .WithName("ReplaceDoctorWorkingHours");
 
         group.MapGet("/available-slots", async (Guid doctorId, string date, SchedulingService service, CancellationToken ct) =>
         {
