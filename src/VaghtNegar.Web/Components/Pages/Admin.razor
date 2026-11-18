@@ -3,32 +3,31 @@
 @inject VaghtNegarApiClient ApiClient
 <PageTitle>مدیریت کلینیک | وقت‌نگار</PageTitle>
 <section class="page-heading"><span class="eyebrow">مرکز کنترل</span><h1>مدیریت کلینیک</h1><p class="page-lead">مدیریت مراکز درمانی، پزشکان و تنظیمات سامانه.</p></section>
-@if (loading)
-{
-    <div class="panel-card loading-line"><span></span> در حال دریافت اطلاعات کلینیک...</div>
-}
-else
-{
-    <div class="stats-grid">
-        <article class="stat-card"><div class="stat-icon teal">✚</div><div><span>کلینیک‌ها</span><strong>@(summary?.ClinicCount ?? 0)</strong><small>از API کلینیک‌ها</small></div></article>
-        <article class="stat-card"><div class="stat-icon blue">⚕</div><div><span>پزشکان</span><strong>@(summary?.DoctorCount ?? 0)</strong><small>از API پزشکان</small></div></article>
+@if (loading) { <div class="panel-card loading-line"><span></span> در حال دریافت اطلاعات کلینیک...</div> }
+else {
+<div class="stats-grid">
+    <article class="stat-card"><div class="stat-icon teal">✚</div><div><span>کلینیک‌ها</span><strong>@(summary?.ClinicCount ?? 0)</strong><small>از API کلینیک‌ها</small></div></article>
+    <article class="stat-card"><div class="stat-icon blue">⚕</div><div><span>پزشکان</span><strong>@(summary?.DoctorCount ?? 0)</strong><small>از API پزشکان</small></div></article>
+</div>
+<section class="content-grid admin-lists">
+    <div class="panel-card"><div class="panel-heading"><div><span class="eyebrow">مراکز درمانی</span><h2>کلینیک‌ها</h2></div></div>
+        @if (summary?.Clinics.Count > 0) { <ul class="simple-list">@foreach (var item in summary.Clinics) { <li><span class="list-bullet teal-bullet"></span>@item</li> }</ul> } else { <div class="empty-inline">اطلاعاتی برای نمایش دریافت نشد.</div> }
     </div>
-    <section class="content-grid admin-lists">
-        <div class="panel-card"><div class="panel-heading"><div><span class="eyebrow">مراکز درمانی</span><h2>کلینیک‌ها</h2></div></div>
-            @if (summary?.Clinics.Count > 0) { <ul class="simple-list">@foreach (var item in summary.Clinics) { <li><span class="list-bullet teal-bullet"></span>@item</li> }</ul> } else { <div class="empty-inline">اطلاعاتی برای نمایش دریافت نشد.</div> }
-        </div>
-        <div class="panel-card"><div class="panel-heading"><div><span class="eyebrow">کادر درمان</span><h2>پزشکان</h2></div></div>
-            @if (summary?.Doctors.Count > 0) { <ul class="simple-list">@foreach (var item in summary.Doctors) { <li><span class="list-bullet blue-bullet"></span>@item</li> }</ul> } else { <div class="empty-inline">اطلاعاتی برای نمایش دریافت نشد.</div> }
-        </div>
-    </section>
-}
+    <div class="panel-card"><div class="panel-heading"><div><span class="eyebrow">کادر درمان</span><h2>پزشکان</h2></div></div>
+        @if (summary?.Doctors.Count > 0) { <ul class="simple-list">@foreach (var item in summary.Doctors) { <li><span class="list-bullet blue-bullet"></span>@item</li> }</ul> } else { <div class="empty-inline">اطلاعاتی برای نمایش دریافت نشد.</div> }
+    </div>
+</section>}
 <div class="notice-card"><strong>قابلیت‌های مدیریتی</strong><p>CRUD کامل کلینیک و پزشک، مدیریت نقش‌ها، ساعت کاری، تعطیلات و تنظیمات پرداخت در گام‌های بعدی به پنل متصل خواهند شد.</p></div>
 @code {
     private ApiDashboardSummary? summary;
     private bool loading = true;
-    protected override async Task OnInitializedAsync()
+    private bool loaded;
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (!firstRender || loaded) return;
+        loaded = true;
         summary = await ApiClient.GetDashboardSummaryAsync();
         loading = false;
+        StateHasChanged();
     }
 }
