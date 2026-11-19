@@ -50,7 +50,11 @@
                 <label>نام<input class="admin-input" @bind="newPatientFirstName" /></label>
                 <label>نام خانوادگی<input class="admin-input" @bind="newPatientLastName" /></label>
                 <label>شماره موبایل<input class="admin-input" inputmode="tel" @bind="newPatientMobile" /></label>
-                <label>تاریخ تولد (اختیاری، میلادی)<input class="admin-input" type="date" @bind="newPatientBirthDate" /></label>
+                <label>
+                    تاریخ تولد (شمسی)
+                    <input class="admin-input" inputmode="numeric" placeholder="مثلاً ۱۳۷۰/۰۵/۲۱" @bind="newPatientBirthDateJalali" />
+                    <small class="form-hint">اختیاری؛ تاریخ به شمسی وارد شود.</small>
+                </label>
             </div>
             <div class="admin-form-actions">
                 <button class="btn btn-primary" disabled="@saving" @onclick="CreatePatientAsync">@(saving ? "در حال ذخیره..." : "ثبت بیمار")</button>
@@ -99,7 +103,7 @@
                     <option value="">انتخاب ساعت</option>
                     @foreach (var slot in availableSlots)
                     {
-                        <option value="@slot.StartsAtUtc.ToString("O")">@slot.StartTime تا @slot.EndTime</option>
+                        <option value="@slot.StartsAtUtc.ToUnixTimeSeconds()">@slot.StartTime تا @slot.EndTime</option>
                     }
                 </select>
             </label>
@@ -111,7 +115,7 @@
         <div class="empty-inline">برای این پزشک و تاریخ، ساعت خالی وجود ندارد.</div>
     }
     <div class="admin-form-actions">
-        <button class="btn btn-primary" disabled="@saving || selectedPatient is null || !Guid.TryParse(selectedDoctorId, out _) || !DateTimeOffset.TryParse(selectedSlotUtc, out _)" @onclick="CreateAppointmentAsync">
+        <button class="btn btn-primary" disabled="@saving" @onclick="CreateAppointmentAsync">
             @(saving ? "در حال ثبت..." : "ثبت نوبت برای بیمار انتخاب‌شده")
         </button>
     </div>
@@ -213,7 +217,8 @@
     private string newPatientFirstName = "";
     private string newPatientLastName = "";
     private string newPatientMobile = "";
-    private DateTime? newPatientBirthDate;
+    private string newPatientBirthDateJalali = "";
+    private string? birthDateError;
     private bool loadingAppointments = true;
     private bool loadingSlots;
     private bool searchingPatients;
@@ -266,7 +271,8 @@
         newPatientFirstName = "";
         newPatientLastName = "";
         newPatientMobile = patientSearch;
-        newPatientBirthDate = null;
+        newPatientBirthDateJalali = "";
+        birthDateError = null;
     }
 
     private async Task CreatePatientAsync()
@@ -279,12 +285,25 @@
             return;
         }
 
+        DateOnly? birthDate = null;
+        birthDateError = null;
+        if (!string.IsNullOrWhiteSpace(newPatientBirthDateJalali))
+        {
+            if (!TryParseJalaliDate(newPatientBirthDateJalali, out var parsedBirthDate))
+            {
+                birthDateError = "تاریخ تولد معتبر نیست. نمونه صحیح: ۱۳۷۰/۰۵/۲۱";
+                ShowFeedback(birthDateError, true);
+                return;
+            }
+            birthDate = parsedBirthDate;
+        }
+
         saving = true;
         var result = await ApiClient.CreatePatientAsync(
             newPatientFirstName.Trim(),
             newPatientLastName.Trim(),
             newPatientMobile.Trim(),
-            newPatientBirthDate.HasValue ? DateOnly.FromDateTime(newPatientBirthDate.Value) : null);
+            birthDate);
         saving = false;
 
         if (!result.Succeeded)
@@ -307,33 +326,54 @@
             ShowFeedback("ابتدا پزشک را انتخاب کنید.", true);
             return;
         }
-        if (string.IsNullOrWhiteSpace(jalaliDate))
+        if (!TryParseJalaliDate(jalaliDate, out _))
         {
-            ShowFeedback("تاریخ شمسی نوبت را وارد کنید.", true);
+            ShowFeedback("تاریخ شمسی معتبر نیست. نمونه صحیح: ۱۴۰۵/۰۸/۲۸", true);
             return;
         }
 
         loadingSlots = true;
         slotsLoaded = false;
         selectedSlotUtc = "";
-        availableSlots = await ApiClient.GetAvailableSlotsAsync(doctorId, jalaliDate);
+        availableSlots = await ApiClient.GetAvailableSlotsAsync(doctorId, NormalizeDigits(jalaliDate));
         loadingSlots = false;
         slotsLoaded = true;
+        if (availableSlots.Count == 0)
+            ShowFeedback("برای این تاریخ ساعت آزادی پیدا نشد؛ برنامه کاری پزشک و تاریخ را بررسی کنید.", true);
+        else
+            ShowFeedback($"{availableSlots.Count} ساعت خالی پیدا شد.", false);
     }
 
     private async Task CreateAppointmentAsync()
     {
-        if (selectedPatient is null ||
-            !Guid.TryParse(selectedDoctorId, out var doctorId) ||
-            !DateTimeOffset.TryParse(selectedSlotUtc, out var startsAtUtc))
+        if (selectedPatient is null)
         {
-            ShowFeedback("بیمار، پزشک و ساعت نوبت را انتخاب کنید.", true);
+            ShowFeedback("ابتدا بیمار را انتخاب کنید.", true);
+            return;
+        }
+        if (!Guid.TryParse(selectedDoctorId, out var doctorId))
+        {
+            ShowFeedback("ابتدا پزشک را انتخاب کنید.", true);
+            return;
+        }
+        if (!long.TryParse(selectedSlotUtc, out var selectedSlotTimestamp))
+        {
+            ShowFeedback("ابتدا یکی از ساعت‌های آزاد را انتخاب کنید.", true);
+            return;
+        }
+
+        var selectedSlot = availableSlots.FirstOrDefault(x =>
+            x.StartsAtUtc.ToUnixTimeSeconds() == selectedSlotTimestamp);
+        if (selectedSlot is null)
+        {
+            ShowFeedback("ساعت انتخاب‌شده دیگر در دسترس نیست. ساعت‌های خالی را دوباره دریافت کنید.", true);
             return;
         }
 
         saving = true;
         var result = await ApiClient.CreateReceptionAppointmentAsync(
-            doctorId, selectedPatient.Id, startsAtUtc.ToUniversalTime(), string.IsNullOrWhiteSpace(patientNote) ? null : patientNote.Trim());
+            doctorId, selectedPatient.Id, selectedSlot.StartsAtUtc.ToUniversalTime(),
+            string.IsNullOrWhiteSpace(patientNote) ? null : patientNote.Trim());
         saving = false;
 
         if (!result.Succeeded)
@@ -395,6 +435,37 @@
         feedback = message;
         feedbackIsError = isError;
     }
+
+    private static bool TryParseJalaliDate(string value, out DateOnly date)
+    {
+        date = default;
+        var normalized = NormalizeDigits(value.Trim()).Replace('-', '/');
+        var parts = normalized.Split('/');
+        if (parts.Length != 3 ||
+            !int.TryParse(parts[0], out var year) ||
+            !int.TryParse(parts[1], out var month) ||
+            !int.TryParse(parts[2], out var day))
+            return false;
+
+        try
+        {
+            var calendar = new System.Globalization.PersianCalendar();
+            date = DateOnly.FromDateTime(calendar.ToDateTime(year, month, day, 0, 0, 0, 0));
+            return true;
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+            return false;
+        }
+    }
+
+    private static string NormalizeDigits(string value) => value
+        .Replace("۰", "0").Replace("۱", "1").Replace("۲", "2").Replace("۳", "3")
+        .Replace("۴", "4").Replace("۵", "5").Replace("۶", "6").Replace("۷", "7")
+        .Replace("۸", "8").Replace("۹", "9")
+        .Replace("٠", "0").Replace("١", "1").Replace("٢", "2").Replace("٣", "3")
+        .Replace("٤", "4").Replace("٥", "5").Replace("٦", "6").Replace("٧", "7")
+        .Replace("٨", "8").Replace("٩", "9");
 
     private static string LocalizeStatus(string status) => status switch
     {
