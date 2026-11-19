@@ -23,6 +23,12 @@ public sealed class VaghtNegarApiClient(IJSRuntime jsRuntime)
     public Task<List<AdminDoctorItem>> GetDoctorsAsync(CancellationToken ct = default) =>
         TryGetCollectionAsync<AdminDoctorItem>("bff/api/v1/doctors", ct);
 
+    public Task<ApiReadResult<List<AdminClinicItem>>> GetClinicsResultAsync(CancellationToken ct = default) =>
+        TryGetCollectionResultAsync<AdminClinicItem>("bff/api/v1/clinics", ct);
+
+    public Task<ApiReadResult<List<AdminDoctorItem>>> GetDoctorsResultAsync(CancellationToken ct = default) =>
+        TryGetCollectionResultAsync<AdminDoctorItem>("bff/api/v1/doctors", ct);
+
     public Task<AdminMutationResult> CreateClinicAsync(string name, string slug, CancellationToken ct = default) =>
         SendAsync("POST", "bff/api/v1/clinics/", new { name, slug }, ct);
 
@@ -165,6 +171,31 @@ public sealed class VaghtNegarApiClient(IJSRuntime jsRuntime)
         return SendAsync("PATCH", $"bff/api/v1/appointments/{id}/{action}", new Dictionary<string, object>(), ct);
     }
 
+    private async Task<ApiReadResult<List<T>>> TryGetCollectionResultAsync<T>(string path, CancellationToken ct)
+    {
+        try
+        {
+            var response = await GetAsync(path, ct);
+            if (response.Status is < 200 or >= 300)
+                return new ApiReadResult<List<T>>(false, null, ReadError(response.Body, response.Status));
+
+            using var document = JsonDocument.Parse(response.Body);
+            var items = ExtractItems(document.RootElement)
+                .Select(x => x.Deserialize<T>(JsonOptions))
+                .Where(x => x is not null).Cast<T>().ToList();
+
+            return new ApiReadResult<List<T>>(true, items, null);
+        }
+        catch (JSException)
+        {
+            return new ApiReadResult<List<T>>(false, null, "ارتباط با سرور برقرار نشد. اتصال API را بررسی کنید.");
+        }
+        catch (JsonException)
+        {
+            return new ApiReadResult<List<T>>(false, null, "پاسخ دریافتی از سرور قابل پردازش نیست.");
+        }
+    }
+
     private async Task<List<T>> TryGetCollectionAsync<T>(string path, CancellationToken ct)
     {
         try
@@ -291,6 +322,7 @@ public sealed class VaghtNegarApiClient(IJSRuntime jsRuntime)
     }
 }
 
+public sealed record ApiReadResult<T>(bool Succeeded, T? Data, string? Error);
 public sealed record BrowserApiResponse(int Status, string Body);
 public sealed record ApiDashboardSummary(int ClinicCount, int DoctorCount, IReadOnlyList<string> Clinics, IReadOnlyList<string> Doctors);
 public sealed record ApiCallResult(bool Succeeded, string? Error, IReadOnlyList<AppointmentListItem> Appointments, int Page, int TotalCount, int TotalPages);
