@@ -71,36 +71,52 @@ builder.Services
         };
         options.Events = new OpenIdConnectEvents
         {
-            OnTokenValidated = context =>
+            // Realm roles are normally present in the access token, not necessarily
+            // in the ID token used by OnTokenValidated. Read them after the ticket
+            // has been created and SaveTokens has stored the access token.
+            OnTicketReceived = context =>
             {
-                if (context.Principal?.Identity is not ClaimsIdentity identity)
+                var accessToken = context.Properties?.GetTokenValue("access_token");
+                if (string.IsNullOrWhiteSpace(accessToken))
                     return Task.CompletedTask;
 
-                var realmAccess = context.Principal.FindFirst("realm_access")?.Value;
-                if (string.IsNullOrWhiteSpace(realmAccess))
+                var parts = accessToken.Split('.');
+                if (parts.Length < 2)
                     return Task.CompletedTask;
 
                 try
                 {
-                    using var document = JsonDocument.Parse(realmAccess);
-                    if (document.RootElement.TryGetProperty("roles", out var roles) &&
-                        roles.ValueKind == JsonValueKind.Array)
+                    var payload = parts[1].Replace('-', '+').Replace('_', '/');
+                    payload = payload.PadRight(payload.Length + (4 - payload.Length % 4) % 4, '=');
+                    using var document = JsonDocument.Parse(Convert.FromBase64String(payload));
+
+                    if (!document.RootElement.TryGetProperty("realm_access", out var realmAccess) ||
+                        !realmAccess.TryGetProperty("roles", out var roles) ||
+                        roles.ValueKind != JsonValueKind.Array)
+                        return Task.CompletedTask;
+
+                    var identity = context.Principal?.Identities
+                        .FirstOrDefault(x => x.IsAuthenticated);
+                    if (identity is null)
+                        return Task.CompletedTask;
+
+                    foreach (var role in roles.EnumerateArray())
                     {
-                        foreach (var role in roles.EnumerateArray())
+                        if (role.ValueKind != JsonValueKind.String)
+                            continue;
+
+                        var value = role.GetString();
+                        if (!string.IsNullOrWhiteSpace(value) &&
+                            !identity.HasClaim(ClaimTypes.Role, value))
                         {
-                            if (role.ValueKind != JsonValueKind.String) continue;
-                            var value = role.GetString();
-                            if (!string.IsNullOrWhiteSpace(value) &&
-                                !identity.HasClaim(ClaimTypes.Role, value))
-                            {
-                                identity.AddClaim(new Claim(ClaimTypes.Role, value));
-                            }
+                            identity.AddClaim(new Claim(ClaimTypes.Role, value));
                         }
                     }
                 }
-                catch (JsonException)
+                catch (Exception ex) when (ex is JsonException or FormatException)
                 {
-                    context.Fail("Keycloak realm roles claim is invalid.");
+                    // Leave the user authenticated; authorization will deny access
+                    // when the token does not contain a readable role claim.
                 }
 
                 return Task.CompletedTask;
