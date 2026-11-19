@@ -59,28 +59,41 @@ public sealed class VaghtNegarApiClient(IJSRuntime jsRuntime)
         return result.Succeeded ? result.Data : null;
     }
 
+    public Task<ApiReadResult<PatientProfileDto>> GetMyPatientProfileResultAsync(CancellationToken ct = default) =>
+        TryGetItemResultAsync<PatientProfileDto>("bff/api/v1/me/patient", ct, allowNotFound: true);
+
     public async Task<PatientProfileDto?> GetMyPatientProfileAsync(CancellationToken ct = default)
     {
-        try
-        {
-            var response = await GetAsync("bff/api/v1/me/patient", ct);
-            if (response.Status is < 200 or >= 300) return null;
-            return JsonSerializer.Deserialize<PatientProfileDto>(response.Body, JsonOptions);
-        }
-        catch (JSException) { return null; }
-        catch (JsonException) { return null; }
+        var result = await GetMyPatientProfileResultAsync(ct);
+        return result.Succeeded ? result.Data : null;
     }
 
-    public async Task<PatientAppointmentsPageDto?> GetMyAppointmentsAsync(int page = 1, CancellationToken ct = default)
+    public async Task<ApiReadResult<PatientAppointmentsPageDto>> GetMyAppointmentsResultAsync(int page = 1, CancellationToken ct = default)
     {
         try
         {
             var response = await GetAsync($"bff/api/v1/me/appointments?page={page}&pageSize=20", ct);
-            if (response.Status is < 200 or >= 300) return null;
-            return JsonSerializer.Deserialize<PatientAppointmentsPageDto>(response.Body, JsonOptions);
+            if (response.Status is < 200 or >= 300)
+                return new ApiReadResult<PatientAppointmentsPageDto>(false, null, ReadError(response.Body, response.Status));
+            var data = JsonSerializer.Deserialize<PatientAppointmentsPageDto>(response.Body, JsonOptions);
+            return data is null
+                ? new ApiReadResult<PatientAppointmentsPageDto>(false, null, "پاسخ دریافتی از سرور خالی است.")
+                : new ApiReadResult<PatientAppointmentsPageDto>(true, data, null);
         }
-        catch (JSException) { return null; }
-        catch (JsonException) { return null; }
+        catch (JSException)
+        {
+            return new ApiReadResult<PatientAppointmentsPageDto>(false, null, "ارتباط با سرور برقرار نشد. اتصال API را بررسی کنید.");
+        }
+        catch (JsonException)
+        {
+            return new ApiReadResult<PatientAppointmentsPageDto>(false, null, "پاسخ دریافتی از سرور قابل پردازش نیست.");
+        }
+    }
+
+    public async Task<PatientAppointmentsPageDto?> GetMyAppointmentsAsync(int page = 1, CancellationToken ct = default)
+    {
+        var result = await GetMyAppointmentsResultAsync(page, ct);
+        return result.Succeeded ? result.Data : null;
     }
 
     public Task<AdminMutationResult> CancelMyAppointmentAsync(Guid id, CancellationToken ct = default) =>
