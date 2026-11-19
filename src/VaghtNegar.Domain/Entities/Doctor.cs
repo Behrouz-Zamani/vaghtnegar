@@ -7,6 +7,7 @@ public sealed class Doctor
     public string FirstName { get; private set; } = string.Empty;
     public string LastName { get; private set; } = string.Empty;
     public string? MedicalCode { get; private set; }
+    public string? IdentityUserId { get; private set; }
     public bool IsActive { get; private set; } = true;
     public DateTimeOffset CreatedAtUtc { get; private set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset? UpdatedAtUtc { get; private set; }
@@ -23,6 +24,12 @@ public sealed class Doctor
     public void UpdateDetails(string firstName, string lastName, string? medicalCode)
     {
         SetDetails(firstName, lastName, medicalCode);
+        UpdatedAtUtc = DateTimeOffset.UtcNow;
+    }
+
+    public void LinkIdentity(string? identityUserId)
+    {
+        IdentityUserId = string.IsNullOrWhiteSpace(identityUserId) ? null : identityUserId.Trim();
         UpdatedAtUtc = DateTimeOffset.UtcNow;
     }
 
