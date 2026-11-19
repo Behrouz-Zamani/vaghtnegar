@@ -28,3 +28,41 @@
 .count-chip{display:inline-block;vertical-align:middle;margin-right:5px;background:#edf5f2;color:#277b6d;border-radius:20px;padding:3px 8px;font-size:10px}
 .form-hint{font-size:10px;color:#9a8880;margin:10px 0 0}
 @media(max-width:720px){.patient-results{grid-template-columns:1fr}.reception-search-row{align-items:stretch}.reception-search-row .admin-input{min-width:100%}.reception-search-row .btn{flex:1}.selected-patient{align-items:flex-start}.reception-filter-row{align-items:stretch}.reception-filter-row label{flex:1;justify-content:space-between}.reception-filter-row .admin-input{flex:1}}
+
+
+/* Doctor self-service schedule */
+.doctor-profile-card{display:flex;align-items:center;gap:13px;background:#fff;border:1px solid #e7efec;border-radius:14px;padding:15px 18px;margin-bottom:17px}
+.doctor-avatar{width:43px;height:43px;display:grid;place-items:center;border-radius:13px;background:#e6f4ef;color:#147c6e;font-size:22px}
+.doctor-profile-card>div:nth-child(2){display:flex;flex-direction:column;gap:4px;flex:1}
+.doctor-profile-card small{font-size:9px;color:#93a19d}
+.doctor-profile-card strong{font-size:13px;color:#304b45}
+.doctor-profile-card span{font-size:10px;color:#82938d}
+.doctor-profile-card>.admin-status{flex:0 0 auto}
+.doctor-schedule-section{margin-bottom:17px}
+.doctor-help{font-size:10px;color:#82938e;line-height:2;margin:-3px 0 17px}
+.doctor-week-grid{display:flex;flex-direction:column;gap:8px}
+.doctor-day-row{display:grid;grid-template-columns:1.1fr 1fr 1fr 1fr;align-items:end;gap:12px;padding:12px;border:1px solid #edf1ef;border-radius:10px;background:#fafcfb}
+.doctor-day-row.enabled{border-color:#d6eae3;background:#f6fbf8}
+.doctor-day-toggle{display:flex;align-items:center;gap:9px;min-height:38px;color:#536b63;font-size:11px}
+.doctor-day-toggle input{accent-color:#0f766e;width:16px;height:16px}
+.doctor-time-field{display:flex;flex-direction:column;gap:6px;color:#8b9994;font-size:9px}
+.doctor-time-field .admin-input{padding:8px 9px;min-height:36px}
+.doctor-time-field .admin-input:disabled{background:#f0f2f1;color:#b1b9b6}
+.doctor-schedule-actions{display:flex;gap:9px;margin-top:17px}
+.doctor-availability-filter{display:flex;align-items:end;gap:10px;flex-wrap:wrap}
+.doctor-availability-filter label{display:flex;flex-direction:column;gap:6px;font-size:10px;color:#71817d;min-width:180px}
+.doctor-slot-list{display:flex;flex-wrap:wrap;gap:8px;margin-top:15px}
+.doctor-slot{padding:8px 12px;border-radius:9px;background:#edf7f3;border:1px solid #d8ede5;color:#237b69;font-size:10px;font-variant-numeric:tabular-nums}
+.doctor-warning{margin-top:10px}
+.doctor-link-editor{display:flex;gap:5px;min-width:210px}
+.doctor-link-editor .admin-input{min-width:120px;padding:7px;font-size:9px}
+.linked-account{display:block;color:#16805e;font-size:9px;margin-top:4px}
+@media(max-width:720px){
+ .doctor-day-row{grid-template-columns:1fr 1fr;gap:9px}
+ .doctor-day-toggle{grid-column:1/-1}
+ .doctor-profile-card{padding:12px}
+ .doctor-profile-card>.admin-status{font-size:8px}
+ .doctor-schedule-actions{flex-wrap:wrap}
+ .doctor-availability-filter label{flex:1}
+ .doctor-link-editor{min-width:190px}
+}
