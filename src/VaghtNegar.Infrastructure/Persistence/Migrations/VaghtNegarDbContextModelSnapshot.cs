@@ -55,11 +55,13 @@ partial class VaghtNegarDbContextModelSnapshot : ModelSnapshot
             entity.Property<string>("FirstName").IsRequired().HasMaxLength(100).HasColumnType("nvarchar(100)");
             entity.Property<string>("LastName").IsRequired().HasMaxLength(100).HasColumnType("nvarchar(100)");
             entity.Property<string>("MedicalCode").HasMaxLength(50).HasColumnType("nvarchar(50)");
+            entity.Property<string>("IdentityUserId").HasMaxLength(128).HasColumnType("nvarchar(128)");
             entity.Property<bool>("IsActive").HasColumnType("bit");
             entity.Property<DateTimeOffset>("CreatedAtUtc").HasColumnType("datetimeoffset");
             entity.Property<DateTimeOffset?>("UpdatedAtUtc").HasColumnType("datetimeoffset");
             entity.HasKey("Id");
             entity.HasIndex("ClinicId", "MedicalCode");
+            entity.HasIndex("IdentityUserId").IsUnique().HasFilter("[IdentityUserId] IS NOT NULL");
             entity.ToTable("Doctors");
         });
 
