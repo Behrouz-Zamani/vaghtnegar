@@ -110,7 +110,7 @@ public sealed class VaghtNegarApiClient(IJSRuntime jsRuntime)
 
         // Send an explicit empty JSON object so the BFF forwards a PATCH body
         // consistently across browsers and hosting environments.
-        return SendAsync("PATCH", $"bff/api/v1/appointments/{id}/{action}", new { }, ct);
+        return SendAsync("PATCH", $"bff/api/v1/appointments/{id}/{action}", new Dictionary<string, object>(), ct);
     }
 
     private async Task<List<T>> TryGetCollectionAsync<T>(string path, CancellationToken ct)
