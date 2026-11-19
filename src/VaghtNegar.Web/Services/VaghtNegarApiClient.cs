@@ -1,5 +1,4 @@
 using System.Net;
-using System.Text;
 using System.Text.Json;
 using Microsoft.JSInterop;
 
@@ -42,18 +41,78 @@ public sealed class VaghtNegarApiClient(IJSRuntime jsRuntime)
     public Task<AdminMutationResult> SetDoctorActiveAsync(Guid id, bool isActive, CancellationToken ct = default) =>
         SendAsync("PATCH", $"bff/api/v1/doctors/{id}/active", new { isActive }, ct);
 
-    public async Task<ApiCallResult> GetAppointmentsAsync(CancellationToken cancellationToken = default)
+    public async Task<ApiCallResult> GetAppointmentsAsync(
+        int page = 1,
+        Guid? patientId = null,
+        string? status = null,
+        CancellationToken cancellationToken = default)
     {
-        var response = await GetAsync("bff/api/v1/appointments?page=1&pageSize=6", cancellationToken);
-        if (response.Status == (int)HttpStatusCode.Unauthorized)
-            return new ApiCallResult(false, "نشست ورود منقضی شده است. دوباره وارد شوید.", []);
-        if (response.Status == (int)HttpStatusCode.Forbidden)
-            return new ApiCallResult(false, "نقش فعلی اجازه مشاهده فهرست نوبت‌ها را ندارد.", []);
-        if (response.Status is < 200 or >= 300)
-            return new ApiCallResult(false, $"دریافت نوبت‌ها ناموفق بود (کد {response.Status}).", []);
+        var query = $"?page={page}&pageSize=20";
+        if (patientId.HasValue) query += $"&patientId={patientId.Value}";
+        if (!string.IsNullOrWhiteSpace(status)) query += $"&status={Uri.EscapeDataString(status)}";
 
-        using var document = JsonDocument.Parse(response.Body);
-        return new ApiCallResult(true, null, ExtractItems(document.RootElement).Select(ReadAppointment).ToArray());
+        try
+        {
+            var response = await GetAsync("bff/api/v1/appointments" + query, cancellationToken);
+            if (response.Status is < 200 or >= 300)
+                return new ApiCallResult(false, ReadError(response.Body, response.Status), [], page, 0, 0);
+
+            using var document = JsonDocument.Parse(response.Body);
+            var root = document.RootElement;
+            var items = ExtractItems(root).Select(ReadAppointment).ToArray();
+            var totalCount = ReadInt(root, "totalCount", items.Length);
+            var totalPages = ReadInt(root, "totalPages", totalCount == 0 ? 0 : 1);
+            var currentPage = ReadInt(root, "page", page);
+            return new ApiCallResult(true, null, items, currentPage, totalCount, totalPages);
+        }
+        catch (JSException)
+        {
+            return new ApiCallResult(false, "ارتباط با سرور برقرار نشد. اتصال API را بررسی کنید.", [], page, 0, 0);
+        }
+        catch (JsonException)
+        {
+            return new ApiCallResult(false, "پاسخ دریافتی از سرور قابل پردازش نیست.", [], page, 0, 0);
+        }
+    }
+
+    public async Task<List<PatientListItem>> GetPatientsAsync(string? search, CancellationToken ct = default)
+    {
+        var path = "bff/api/v1/patients/";
+        if (!string.IsNullOrWhiteSpace(search))
+            path += "?search=" + Uri.EscapeDataString(search.Trim());
+        return await TryGetCollectionAsync<PatientListItem>(path, ct);
+    }
+
+    public Task<AdminMutationResult> CreatePatientAsync(
+        string firstName, string lastName, string mobileNumber, DateOnly? birthDate, CancellationToken ct = default) =>
+        SendAsync("POST", "bff/api/v1/patients/", new { firstName, lastName, mobileNumber, birthDate }, ct);
+
+    public async Task<List<AvailableSlotItem>> GetAvailableSlotsAsync(
+        Guid doctorId, string jalaliDate, CancellationToken ct = default)
+    {
+        var path = $"bff/api/v1/doctors/{doctorId}/schedule/available-slots?date={Uri.EscapeDataString(jalaliDate)}";
+        return await TryGetCollectionAsync<AvailableSlotItem>(path, ct);
+    }
+
+    public Task<AdminMutationResult> CreateReceptionAppointmentAsync(
+        Guid doctorId, Guid patientId, DateTimeOffset startsAtUtc, string? patientNote, CancellationToken ct = default) =>
+        SendAsync("POST", "bff/api/v1/appointments", new { doctorId, patientId, startsAtUtc, patientNote }, ct);
+
+    public async Task<AdminMutationResult> ChangeAppointmentStatusAsync(
+        Guid id, string action, CancellationToken ct = default)
+    {
+        try
+        {
+            var response = await jsRuntime.InvokeAsync<BrowserApiResponse>(
+                "vaghtNegarApi.request", ct, "PATCH", $"bff/api/v1/appointments/{id}/{action}", (string?)null);
+            return response.Status is >= 200 and < 300
+                ? new AdminMutationResult(true, "وضعیت نوبت با موفقیت تغییر کرد.")
+                : new AdminMutationResult(false, ReadError(response.Body, response.Status));
+        }
+        catch (JSException)
+        {
+            return new AdminMutationResult(false, "ارتباط با سرور برقرار نشد.");
+        }
     }
 
     private async Task<List<T>> TryGetCollectionAsync<T>(string path, CancellationToken ct)
@@ -99,13 +158,18 @@ public sealed class VaghtNegarApiClient(IJSRuntime jsRuntime)
                 errors.ValueKind == JsonValueKind.Object)
                 return string.Join(" ", errors.EnumerateObject().SelectMany(x =>
                     x.Value.EnumerateArray().Select(v => v.GetString()).Where(v => !string.IsNullOrWhiteSpace(v))));
+            if (document.RootElement.TryGetProperty("title", out var title) &&
+                title.ValueKind == JsonValueKind.String)
+                return title.GetString() ?? $"خطای سرور ({status}).";
         }
         catch (JsonException) { }
         return status switch
         {
             401 => "نشست ورود منقضی شده است. دوباره وارد شوید.",
             403 => "دسترسی لازم برای این عملیات را ندارید.",
-            409 => "این اطلاعات با یک رکورد موجود تداخل دارد.",
+            404 => "رکورد موردنظر یافت نشد.",
+            409 => "این زمان قبلاً رزرو شده یا اطلاعات با یک رکورد موجود تداخل دارد.",
+            >= 500 => $"خطای داخلی سرور ({status}). جزئیات را در لاگ API بررسی کنید.",
             _ => $"عملیات ناموفق بود (کد {status})."
         };
     }
@@ -124,22 +188,44 @@ public sealed class VaghtNegarApiClient(IJSRuntime jsRuntime)
         return [];
     }
 
+    private static int ReadInt(JsonElement root, string name, int fallback) =>
+        root.ValueKind == JsonValueKind.Object &&
+        root.TryGetProperty(name, out var value) &&
+        value.TryGetInt32(out var number) ? number : fallback;
+
     private static AppointmentListItem ReadAppointment(JsonElement item)
     {
-        var doctor = item.TryGetProperty("doctorFullName", out var doctorName) ? doctorName.GetString() ?? "پزشک" : "پزشک";
-        var status = item.TryGetProperty("status", out var statusValue) ? statusValue.ToString() : "نامشخص";
-        var time = item.TryGetProperty("startsAtUtc", out var startValue) &&
-                   DateTimeOffset.TryParse(startValue.ToString(), out var parsed)
-            ? parsed.ToLocalTime().ToString("HH:mm") : "--:--";
-        var patient = item.TryGetProperty("patientFullName", out var patientName) ? patientName.GetString() ?? "بیمار" : "بیمار";
-        return new AppointmentListItem(doctor, patient, time, status);
+        var doctor = ReadString(item, "doctorFullName", "پزشک");
+        var patient = ReadString(item, "patientFullName", "بیمار");
+        var mobile = ReadString(item, "patientMobileNumber", "");
+        var status = ReadString(item, "status", "نامشخص");
+        var startsAt = ReadDate(item, "startsAtUtc");
+        var endsAt = ReadDate(item, "endsAtUtc");
+        var id = ReadGuid(item, "id");
+        var doctorId = ReadGuid(item, "doctorId");
+        var patientId = ReadGuid(item, "patientId");
+        return new AppointmentListItem(id, doctorId, patientId, doctor, patient, mobile, startsAt, endsAt, status);
     }
+
+    private static string ReadString(JsonElement item, string name, string fallback) =>
+        item.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String
+            ? value.GetString() ?? fallback : fallback;
+
+    private static Guid ReadGuid(JsonElement item, string name) =>
+        item.TryGetProperty(name, out var value) && Guid.TryParse(value.ToString(), out var result)
+            ? result : Guid.Empty;
+
+    private static DateTimeOffset ReadDate(JsonElement item, string name) =>
+        item.TryGetProperty(name, out var value) && DateTimeOffset.TryParse(value.ToString(), out var result)
+            ? result : DateTimeOffset.MinValue;
 }
 
 public sealed record BrowserApiResponse(int Status, string Body);
 public sealed record ApiDashboardSummary(int ClinicCount, int DoctorCount, IReadOnlyList<string> Clinics, IReadOnlyList<string> Doctors);
-public sealed record ApiCallResult(bool Succeeded, string? Error, IReadOnlyList<AppointmentListItem> Appointments);
-public sealed record AppointmentListItem(string Doctor, string Patient, string Time, string Status);
+public sealed record ApiCallResult(bool Succeeded, string? Error, IReadOnlyList<AppointmentListItem> Appointments, int Page, int TotalCount, int TotalPages);
+public sealed record AppointmentListItem(Guid Id, Guid DoctorId, Guid PatientId, string Doctor, string Patient, string MobileNumber, DateTimeOffset StartsAtUtc, DateTimeOffset EndsAtUtc, string Status);
 public sealed record AdminMutationResult(bool Succeeded, string Message);
 public sealed record AdminClinicItem(Guid Id, string Name, string Slug, bool IsActive);
 public sealed record AdminDoctorItem(Guid Id, Guid ClinicId, string FirstName, string LastName, string? MedicalCode, bool IsActive);
+public sealed record PatientListItem(Guid Id, string FirstName, string LastName, string MobileNumber, DateOnly? BirthDate, bool IsActive);
+public sealed record AvailableSlotItem(string JalaliDate, string DayName, string StartTime, string EndTime, DateTimeOffset StartsAtUtc, DateTimeOffset EndsAtUtc);
