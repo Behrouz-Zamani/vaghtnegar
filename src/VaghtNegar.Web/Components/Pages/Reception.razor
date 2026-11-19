@@ -350,7 +350,9 @@
         ShowFeedback("نوبت با موفقیت ثبت شد.", false);
     }
 
-    private async Task ReloadAppointmentsAsync(int page = 1)
+    private Task ReloadAppointmentsAsync() => LoadAppointmentsPageAsync(1);
+
+    private async Task LoadAppointmentsPageAsync(int page)
     {
         loadingAppointments = true;
         appointmentResult = await ApiClient.GetAppointmentsAsync(
@@ -358,9 +360,9 @@
         loadingAppointments = false;
     }
 
-    private Task ApplyFilterAsync() => ReloadAppointmentsAsync();
-    private Task PreviousPageAsync() => ReloadAppointmentsAsync(Math.Max(1, (appointmentResult?.Page ?? 1) - 1));
-    private Task NextPageAsync() => ReloadAppointmentsAsync(Math.Min(appointmentResult?.TotalPages ?? 1, (appointmentResult?.Page ?? 1) + 1));
+    private Task ApplyFilterAsync() => LoadAppointmentsPageAsync(1);
+    private Task PreviousPageAsync() => LoadAppointmentsPageAsync(Math.Max(1, (appointmentResult?.Page ?? 1) - 1));
+    private Task NextPageAsync() => LoadAppointmentsPageAsync(Math.Min(appointmentResult?.TotalPages ?? 1, (appointmentResult?.Page ?? 1) + 1));
 
     private async Task ConfirmAppointmentAsync(AppointmentListItem item) =>
         await ChangeStatusAsync(item, "confirm");
@@ -384,7 +386,7 @@
             ShowFeedback(result.Message, true);
             return;
         }
-        await ReloadAppointmentsAsync(appointmentResult?.Page ?? 1);
+        await LoadAppointmentsPageAsync(appointmentResult?.Page ?? 1);
         ShowFeedback(result.Message, false);
     }
 
