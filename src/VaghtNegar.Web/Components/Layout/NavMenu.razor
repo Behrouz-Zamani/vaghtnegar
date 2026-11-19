@@ -1,28 +1,25 @@
-<nav class="nav-menu">
-    <AuthorizeView>
-        <Authorized Context="outerAuth">
-            <NavLink href="/" Match="NavLinkMatch.All" class="nav-link">
-                <span class="nav-icon">⌂</span><span>نمای کلی</span>
-            </NavLink>
-            <div class="nav-section-label">خدمات</div>
-            <AuthorizeView Roles="Patient">
-                <NavLink href="/patient" class="nav-link"><span class="nav-icon">♡</span><span>پنل بیمار</span></NavLink>
-            </AuthorizeView>
-            <AuthorizeView Roles="Doctor">
-                <NavLink href="/doctor" class="nav-link"><span class="nav-icon">⚕</span><span>پنل پزشک</span></NavLink>
-            </AuthorizeView>
-            <AuthorizeView Roles="Receptionist,ClinicAdmin,SuperAdmin">
-                <NavLink href="/reception" class="nav-link"><span class="nav-icon">▤</span><span>پذیرش و نوبت‌ها</span></NavLink>
-            </AuthorizeView>
-            <AuthorizeView Roles="ClinicAdmin,SuperAdmin">
-                <NavLink href="/admin" class="nav-link"><span class="nav-icon">⚙</span><span>مدیریت کلینیک</span></NavLink>
-            </AuthorizeView>
-            <div class="nav-section-label">حساب کاربری</div>
-            <a class="nav-link" href="/account/logout"><span class="nav-icon">↪</span><span>خروج از حساب</span></a>
-        </Authorized>
-        <NotAuthorized>
-            <NavLink href="/" Match="NavLinkMatch.All" class="nav-link"><span class="nav-icon">⌂</span><span>صفحه اصلی</span></NavLink>
-            <a class="nav-link" href="/account/login"><span class="nav-icon">⇥</span><span>ورود به سامانه</span></a>
-        </NotAuthorized>
-    </AuthorizeView>
+<nav class="nav-menu" aria-label="منوی اصلی">
+    <NavLink href="/" Match="NavLinkMatch.All" class="nav-link">
+        <span class="nav-icon">⌂</span><span>نمای کلی</span>
+    </NavLink>
+
+    <div class="nav-section-label">خدمات سامانه</div>
+
+    <NavLink href="/reception" class="nav-link">
+        <span class="nav-icon">▤</span><span>پذیرش و نوبت‌ها</span>
+    </NavLink>
+    <NavLink href="/admin" class="nav-link">
+        <span class="nav-icon">⚙</span><span>مدیریت کلینیک</span>
+    </NavLink>
+    <NavLink href="/patient" class="nav-link">
+        <span class="nav-icon">♡</span><span>پنل بیمار</span>
+    </NavLink>
+    <NavLink href="/doctor" class="nav-link">
+        <span class="nav-icon">⚕</span><span>پنل پزشک</span>
+    </NavLink>
+
+    <div class="nav-section-label">حساب کاربری</div>
+    <a class="nav-link" href="/account/logout">
+        <span class="nav-icon">↪</span><span>خروج از حساب</span>
+    </a>
 </nav>
