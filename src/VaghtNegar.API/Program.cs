@@ -2,7 +2,6 @@ using System.Security.Claims;
 using System.Text.Json;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
-using Microsoft.OpenApi.Models;
 using VaghtNegar.API.Endpoints;
 using VaghtNegar.Application;
 using VaghtNegar.Infrastructure;
@@ -15,45 +14,24 @@ var keycloakAuthority = builder.Configuration["Keycloak:Authority"]
 var keycloakAudience = builder.Configuration["Keycloak:Audience"]
     ?? "vaghtnegar-api";
 
-builder.Services.AddOpenApi();
+//builder.Services.AddOpenApi();
+builder.Services.AddSwaggerGen();
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(options =>
-{
-    options.AddSecurityDefinition("Keycloak", new OpenApiSecurityScheme
-    {
-        Type = SecuritySchemeType.OAuth2,
-        Description = "ورود با Keycloak و روش Authorization Code + PKCE",
-        Flows = new OpenApiOAuthFlows
-        {
-            AuthorizationCode = new OpenApiOAuthFlow
-            {
-                AuthorizationUrl = new Uri($"{keycloakAuthority}/protocol/openid-connect/auth"),
-                TokenUrl = new Uri($"{keycloakAuthority}/protocol/openid-connect/token"),
-                Scopes = new Dictionary<string, string>
-                {
-                    ["openid"] = "OpenID Connect",
-                    ["profile"] = "Basic profile",
-                    ["email"] = "Email address"
-                }
-            }
-        }
-    });
-
-    options.AddSecurityRequirement(new OpenApiSecurityRequirement
-    {
-        {
-            new OpenApiSecurityScheme
-            {
-                Reference = new OpenApiReference
-                {
-                    Type = ReferenceType.SecurityScheme,
-                    Id = "Keycloak"
-                }
-            },
-            new[] { "openid", "profile", "email" }
-        }
-    });
-});
+//options.AddSecurityRequirement(new OpenApiSecurityRequirement
+//    {
+//        {
+//            new OpenApiSecurityScheme
+//            {
+//                Reference = new OpenApiReference
+//                {
+//                    Type = ReferenceType.SecurityScheme,
+//                    Id = "Keycloak"
+//                }
+//            },
+//            new[] { "openid", "profile", "email" }
+//        }
+//    });
+//});
 
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -125,17 +103,9 @@ app.UseAuthorization();
 
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();
+    //app.MapOpenApi();
     app.UseSwagger();
-    app.UseSwaggerUI(options =>
-    {
-        options.SwaggerEndpoint("/swagger/v1/swagger.json", "VaghtNegar API v1");
-        options.RoutePrefix = "swagger";
-        options.DocumentTitle = "VaghtNegar API";
-        options.OAuthClientId("vaghtnegar-web");
-        options.OAuthUsePkce();
-        options.OAuthScopes("openid", "profile", "email");
-    });
+    app.UseSwaggerUI();
 }
 
 app.MapGet("/", () => Results.Ok(new
@@ -143,7 +113,7 @@ app.MapGet("/", () => Results.Ok(new
     application = "VaghtNegar",
     status = "running",
     version = "0.7.0",
-    documentation = "/swagger"
+    documentation = "/openapi/v1.json"
 })).WithName("GetApiInfo");
 
 app.MapGet("/health/live", () => Results.Ok(new { status = "Healthy" }))
@@ -172,11 +142,10 @@ app.MapGet("/api/v1/auth/me", (ClaimsPrincipal user) =>
 .RequireAuthorization()
 .WithTags("Authentication")
 .WithName("GetCurrentUser")
-.WithSummary("اطلاعات هویت کاربر واردشده");
+.WithSummary("Ø§Ø·Ù„Ø§Ø¹Ø§Øª Ù‡ÙˆÛŒØª Ú©Ø§Ø±Ø¨Ø± ÙˆØ§Ø±Ø¯Ø´Ø¯Ù‡");
 
 app.MapClinicEndpoints();
 app.MapDoctorEndpoints();
-app.MapDoctorPortalEndpoints();
 app.MapPatientEndpoints();
 app.MapSchedulingEndpoints();
 app.MapAppointmentBookingEndpoints();
@@ -186,3 +155,5 @@ app.MapPatientPortalEndpoints();
 app.Run();
 
 public partial class Program { }
+
+
