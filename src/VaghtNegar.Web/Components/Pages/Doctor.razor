@@ -1,10 +1,232 @@
 @page "/doctor"
 @attribute [Authorize(Roles = "Doctor")]
+@inject VaghtNegarApiClient ApiClient
+
 <PageTitle>پنل پزشک | وقت‌نگار</PageTitle>
-<section class="page-heading"><span class="eyebrow">فضای کاری پزشک</span><h1>پنل پزشک</h1><p class="page-lead">برنامه کاری و مدیریت مراجعات روزانه.</p></section>
-<div class="feature-grid">
-    <article class="feature-card"><span class="feature-icon blue">▦</span><h2>برنامه کاری</h2><p>مشاهده و تنظیم ساعت‌های حضور و شیفت‌های هفتگی.</p><span class="feature-state">API برنامه کاری آماده است</span></article>
-    <article class="feature-card"><span class="feature-icon teal">◷</span><h2>نوبت‌های امروز</h2><p>مرور فهرست مراجعان و زمان‌بندی ویزیت‌ها.</p><span class="feature-state">در انتظار API اختصاصی پزشک</span></article>
-    <article class="feature-card"><span class="feature-icon violet">♡</span><h2>اطلاعات حرفه‌ای</h2><p>مشاهده مشخصات پزشک و کلینیک‌های همکار.</p><span class="feature-state">در حال توسعه</span></article>
-</div>
-<div class="notice-card"><strong>حریم خصوصی</strong><p>نمایش اطلاعات بیماران در پنل پزشک تا زمان پیاده‌سازی کنترل دسترسی مبتنی بر پزشک و کلینیک فعال نشده است.</p></div>
+
+<section class="page-heading">
+    <span class="eyebrow">فضای کاری پزشک</span>
+    <h1>پنل پزشک</h1>
+    <p class="page-lead">تعریف برنامه حضور هفتگی و ایجاد ساعت‌های قابل رزرو برای پذیرش و بیماران.</p>
+</section>
+
+@if (loading)
+{
+    <div class="panel-card loading-line"><span></span> در حال دریافت اطلاعات پزشک و برنامه کاری...</div>
+}
+else if (doctor is null)
+{
+    <div class="notice-card doctor-warning">
+        <strong>حساب پزشک هنوز به پرونده پزشکی متصل نشده است.</strong>
+        <p>برای فعال شدن این پنل، مدیر سامانه باید در بخش «مدیریت پزشکان»، شناسه حساب Keycloak این کاربر را به پرونده پزشک متصل کند. بعد از اتصال، از حساب خارج و دوباره وارد شوید.</p>
+    </div>
+}
+else
+{
+    <div class="doctor-profile-card">
+        <div class="doctor-avatar">⚕</div>
+        <div><small>پزشک</small><strong>دکتر @doctor.FirstName @doctor.LastName</strong><span>@(doctor.MedicalCode ?? "کد نظام پزشکی ثبت نشده")</span></div>
+        <span class="admin-status active">حساب متصل</span>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(feedback))
+    {
+        <div class="admin-feedback @(feedbackIsError ? "error" : "success")" role="status">@feedback</div>
+    }
+
+    <section class="panel-card doctor-schedule-section">
+        <div class="panel-heading">
+            <div><span class="eyebrow">تنظیمات نوبت‌دهی</span><h2>برنامه کاری هفتگی</h2></div>
+            <span class="count-chip">@scheduleDays.Values.Count(x => x.IsActive) روز فعال</span>
+        </div>
+        <p class="doctor-help">روزهای حضور، ساعت شروع و پایان و مدت هر ویزیت را مشخص کنید. ساعت‌های آزاد بر اساس این برنامه ساخته می‌شوند و پس از رزرو، دیگر به‌عنوان ساعت آزاد نمایش داده نمی‌شوند.</p>
+
+        <div class="doctor-week-grid">
+            @foreach (var day in WeekDays)
+            {
+                var item = scheduleDays[day.Day];
+                <div class="doctor-day-row @(item.IsActive ? "enabled" : "")">
+                    <label class="doctor-day-toggle">
+                        <input type="checkbox" @bind="item.IsActive" />
+                        <strong>@day.Name</strong>
+                    </label>
+                    <label class="doctor-time-field">
+                        <span>از ساعت</span>
+                        <input class="admin-input" type="time" @bind="item.StartTime" disabled="@(!item.IsActive)" />
+                    </label>
+                    <label class="doctor-time-field">
+                        <span>تا ساعت</span>
+                        <input class="admin-input" type="time" @bind="item.EndTime" disabled="@(!item.IsActive)" />
+                    </label>
+                    <label class="doctor-time-field doctor-duration">
+                        <span>مدت ویزیت</span>
+                        <select class="admin-input" @bind="item.SlotDurationMinutes" disabled="@(!item.IsActive)">
+                            <option value="10">۱۰ دقیقه</option>
+                            <option value="15">۱۵ دقیقه</option>
+                            <option value="20">۲۰ دقیقه</option>
+                            <option value="30">۳۰ دقیقه</option>
+                            <option value="45">۴۵ دقیقه</option>
+                            <option value="60">۶۰ دقیقه</option>
+                        </select>
+                    </label>
+                </div>
+            }
+        </div>
+
+        <div class="doctor-schedule-actions">
+            <button class="btn btn-primary" disabled="@saving" @onclick="SaveScheduleAsync">
+                @(saving ? "در حال ذخیره..." : "ذخیره برنامه کاری")
+            </button>
+            <button class="btn btn-outline" disabled="@saving" @onclick="LoadAsync">بازخوانی برنامه</button>
+        </div>
+    </section>
+
+    <section class="panel-card doctor-schedule-section">
+        <div class="panel-heading">
+            <div><span class="eyebrow">کنترل نوبت‌ها</span><h2>بررسی ساعت‌های آزاد</h2></div>
+        </div>
+        <div class="doctor-availability-filter">
+            <label>تاریخ شمسی
+                <input class="admin-input" @bind="jalaliDate" placeholder="۱۴۰۵/۰۹/۰۱" />
+            </label>
+            <button class="btn btn-outline" disabled="@loadingSlots" @onclick="LoadSlotsAsync">نمایش ساعت‌های آزاد</button>
+        </div>
+        @if (slotsLoaded)
+        {
+            @if (availableSlots.Count == 0)
+            {
+                <div class="empty-inline">برای این تاریخ ساعت آزادی وجود ندارد؛ روز هفته و برنامه کاری را بررسی کنید.</div>
+            }
+            else
+            {
+                <div class="doctor-slot-list">
+                    @foreach (var slot in availableSlots)
+                    {
+                        <span class="doctor-slot">@slot.StartTime تا @slot.EndTime</span>
+                    }
+                </div>
+            }
+        }
+    </section>
+}
+
+@code {
+    private static readonly (int Day, string Name)[] WeekDays =
+    [
+        (6, "شنبه"), (0, "یکشنبه"), (1, "دوشنبه"), (2, "سه‌شنبه"),
+        (3, "چهارشنبه"), (4, "پنجشنبه"), (5, "جمعه")
+    ];
+
+    private readonly Dictionary<int, DayScheduleForm> scheduleDays = WeekDays
+        .ToDictionary(x => x.Day, _ => new DayScheduleForm());
+
+    private AdminDoctorItem? doctor;
+    private List<AvailableSlotItem> availableSlots = [];
+    private bool loading = true;
+    private bool saving;
+    private bool loadingSlots;
+    private bool slotsLoaded;
+    private bool feedbackIsError;
+    private string? feedback;
+    private string jalaliDate = "";
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        loading = true;
+        doctor = await ApiClient.GetMyDoctorAsync();
+        if (doctor is not null)
+        {
+            var hours = await ApiClient.GetMyWorkingHoursAsync();
+            foreach (var day in scheduleDays.Values)
+            {
+                day.IsActive = false;
+                day.StartTime = "09:00";
+                day.EndTime = "17:00";
+                day.SlotDurationMinutes = 20;
+            }
+
+            foreach (var group in hours.GroupBy(x => x.DayOfWeek))
+            {
+                var first = group.OrderBy(x => x.StartTime).First();
+                if (!scheduleDays.TryGetValue(group.Key, out var day)) continue;
+                day.IsActive = true;
+                day.StartTime = first.StartTime;
+                day.EndTime = first.EndTime;
+                day.SlotDurationMinutes = first.SlotDurationMinutes;
+            }
+        }
+        loading = false;
+    }
+
+    private async Task SaveScheduleAsync()
+    {
+        var items = new List<WorkingHourInputItem>();
+        foreach (var entry in scheduleDays)
+        {
+            var day = entry.Value;
+            if (!day.IsActive) continue;
+            if (!TimeOnly.TryParse(day.StartTime, out var start) ||
+                !TimeOnly.TryParse(day.EndTime, out var end) || start >= end)
+            {
+                ShowFeedback($"ساعت شروع و پایان روز {WeekDays.First(x => x.Day == entry.Key).Name} معتبر نیست.", true);
+                return;
+            }
+            items.Add(new WorkingHourInputItem(entry.Key, start.ToString("HH:mm"), end.ToString("HH:mm"), day.SlotDurationMinutes));
+        }
+
+        if (items.Count == 0)
+        {
+            ShowFeedback("حداقل یک روز کاری را فعال کنید.", true);
+            return;
+        }
+
+        saving = true;
+        var result = await ApiClient.ReplaceMyWorkingHoursAsync(items);
+        saving = false;
+        if (!result.Succeeded)
+        {
+            ShowFeedback(result.Message, true);
+            return;
+        }
+        slotsLoaded = false;
+        ShowFeedback("برنامه کاری با موفقیت ذخیره شد. ساعت‌های آزاد برای پذیرش قابل دریافت هستند.", false);
+    }
+
+    private async Task LoadSlotsAsync()
+    {
+        if (string.IsNullOrWhiteSpace(jalaliDate))
+        {
+            ShowFeedback("تاریخ شمسی را وارد کنید؛ نمونه: ۱۴۰۵/۰۹/۰۱", true);
+            return;
+        }
+        loadingSlots = true;
+        slotsLoaded = false;
+        availableSlots = await ApiClient.GetAvailableSlotsAsync(doctor!.Id, NormalizeDigits(jalaliDate));
+        loadingSlots = false;
+        slotsLoaded = true;
+    }
+
+    private void ShowFeedback(string message, bool isError)
+    {
+        feedback = message;
+        feedbackIsError = isError;
+    }
+
+    private static string NormalizeDigits(string value) => value
+        .Replace("۰", "0").Replace("۱", "1").Replace("۲", "2").Replace("۳", "3")
+        .Replace("۴", "4").Replace("۵", "5").Replace("۶", "6").Replace("۷", "7")
+        .Replace("۸", "8").Replace("۹", "9")
+        .Replace("٠", "0").Replace("١", "1").Replace("٢", "2").Replace("٣", "3")
+        .Replace("٤", "4").Replace("٥", "5").Replace("٦", "6").Replace("٧", "7")
+        .Replace("٨", "8").Replace("٩", "9");
+
+    private sealed class DayScheduleForm
+    {
+        public bool IsActive { get; set; }
+        public string StartTime { get; set; } = "09:00";
+        public string EndTime { get; set; } = "17:00";
+        public int SlotDurationMinutes { get; set; } = 20;
+    }
+}
