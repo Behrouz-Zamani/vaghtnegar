@@ -66,3 +66,35 @@
  .doctor-availability-filter label{flex:1}
  .doctor-link-editor{min-width:190px}
 }
+
+
+/* Patient portal */
+.patient-profile-card{display:flex;align-items:center;gap:13px;background:#fff;border:1px solid #e7efec;border-radius:14px;padding:15px 18px;margin-bottom:17px}
+.patient-avatar{width:43px;height:43px;display:grid;place-items:center;border-radius:13px;background:#fbeef2;color:#cf7894;font-size:23px}
+.patient-profile-info{display:flex;flex-direction:column;gap:4px;flex:1}
+.patient-profile-info small,.patient-profile-meta small{font-size:9px;color:#93a19d}
+.patient-profile-info strong{font-size:13px;color:#304b45}
+.patient-profile-info span,.patient-profile-meta strong{font-size:10px;color:#82938d}
+.patient-profile-meta{display:flex;flex-direction:column;gap:5px;text-align:left}
+.patient-section{margin-bottom:17px}
+.patient-appointments{display:flex;flex-direction:column;gap:9px}
+.patient-appointment{display:flex;align-items:center;gap:15px;border:1px solid #edf1ef;border-radius:11px;padding:13px}
+.patient-appointment-date{min-width:112px;display:flex;flex-direction:column;gap:5px}
+.patient-appointment-date strong{font-size:11px;color:#36574e}
+.patient-appointment-date span{font-size:10px;color:#0f766e}
+.patient-appointment-main{display:flex;flex-direction:column;gap:5px;flex:1;min-width:0}
+.patient-appointment-main strong{font-size:11px;color:#405750}
+.patient-appointment-main span{font-size:9px;color:#98a5a1;overflow:hidden;text-overflow:ellipsis}
+.patient-appointment-actions{display:flex;align-items:center;gap:8px}
+.patient-appointment .soft-status.cancelled{background:#f8eeee;color:#a96b6b}
+.patient-appointment .soft-status.completed{background:#edf1f8;color:#617eaa}
+.patient-booking-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.patient-booking-grid label{display:flex;flex-direction:column;gap:7px;color:#71817d;font-size:10px}
+.patient-booking-grid .patient-note-field{grid-column:1/-1}
+.patient-booking-actions{margin-top:13px}
+.patient-slot-grid{display:flex;flex-wrap:wrap;gap:8px;margin-top:15px}
+.patient-slot{border:1px solid #d8ede5;background:#edf7f3;color:#237b69;border-radius:9px;padding:9px 14px;font:inherit;font-size:11px;cursor:pointer}
+.patient-slot.selected{background:#0f766e;border-color:#0f766e;color:white}
+.patient-confirm-booking{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:15px;padding:13px;background:#f7faf9;border-radius:10px;color:#6c817a;font-size:10px}
+.patient-confirm-booking strong{color:#0f766e}
+@media(max-width:720px){.patient-profile-card{padding:12px}.patient-appointment{align-items:flex-start;flex-wrap:wrap;gap:9px}.patient-appointment-date{min-width:100px}.patient-appointment-main{min-width:calc(100% - 120px)}.patient-appointment-actions{width:100%;justify-content:space-between}.patient-booking-grid{grid-template-columns:1fr}.patient-booking-grid .patient-note-field{grid-column:auto}.patient-confirm-booking{align-items:flex-start;flex-direction:column}}
