@@ -198,13 +198,15 @@ public sealed class VaghtNegarApiClient(IJSRuntime jsRuntime)
         var doctor = ReadString(item, "doctorFullName", "پزشک");
         var patient = ReadString(item, "patientFullName", "بیمار");
         var mobile = ReadString(item, "patientMobileNumber", "");
-        var status = ReadString(item, "status", "نامشخص");
+        var statusCode = ReadString(item, "status", "Unknown");
         var startsAt = ReadDate(item, "startsAtUtc");
         var endsAt = ReadDate(item, "endsAtUtc");
         var id = ReadGuid(item, "id");
         var doctorId = ReadGuid(item, "doctorId");
         var patientId = ReadGuid(item, "patientId");
-        return new AppointmentListItem(id, doctorId, patientId, doctor, patient, mobile, startsAt, endsAt, status);
+        var time = FormatTehranTime(startsAt);
+        return new AppointmentListItem(id, doctorId, patientId, doctor, patient, mobile,
+            startsAt, endsAt, statusCode, LocalizeStatus(statusCode), time);
     }
 
     private static string ReadString(JsonElement item, string name, string fallback) =>
@@ -218,12 +220,31 @@ public sealed class VaghtNegarApiClient(IJSRuntime jsRuntime)
     private static DateTimeOffset ReadDate(JsonElement item, string name) =>
         item.TryGetProperty(name, out var value) && DateTimeOffset.TryParse(value.ToString(), out var result)
             ? result : DateTimeOffset.MinValue;
+
+    private static string LocalizeStatus(string status) => status switch
+    {
+        "Pending" => "در انتظار",
+        "Confirmed" => "تأییدشده",
+        "Cancelled" => "لغوشده",
+        "Completed" => "انجام‌شده",
+        "NoShow" => "عدم مراجعه",
+        _ => status
+    };
+
+    private static string FormatTehranTime(DateTimeOffset utc)
+    {
+        if (utc == DateTimeOffset.MinValue) return "--:--";
+        TimeZoneInfo zone;
+        try { zone = TimeZoneInfo.FindSystemTimeZoneById("Asia/Tehran"); }
+        catch (TimeZoneNotFoundException) { zone = TimeZoneInfo.FindSystemTimeZoneById("Iran Standard Time"); }
+        return TimeZoneInfo.ConvertTime(utc, zone).ToString("HH:mm");
+    }
 }
 
 public sealed record BrowserApiResponse(int Status, string Body);
 public sealed record ApiDashboardSummary(int ClinicCount, int DoctorCount, IReadOnlyList<string> Clinics, IReadOnlyList<string> Doctors);
 public sealed record ApiCallResult(bool Succeeded, string? Error, IReadOnlyList<AppointmentListItem> Appointments, int Page, int TotalCount, int TotalPages);
-public sealed record AppointmentListItem(Guid Id, Guid DoctorId, Guid PatientId, string Doctor, string Patient, string MobileNumber, DateTimeOffset StartsAtUtc, DateTimeOffset EndsAtUtc, string Status);
+public sealed record AppointmentListItem(Guid Id, Guid DoctorId, Guid PatientId, string Doctor, string Patient, string MobileNumber, DateTimeOffset StartsAtUtc, DateTimeOffset EndsAtUtc, string StatusCode, string Status, string Time);
 public sealed record AdminMutationResult(bool Succeeded, string Message);
 public sealed record AdminClinicItem(Guid Id, string Name, string Slug, bool IsActive);
 public sealed record AdminDoctorItem(Guid Id, Guid ClinicId, string FirstName, string LastName, string? MedicalCode, bool IsActive);
