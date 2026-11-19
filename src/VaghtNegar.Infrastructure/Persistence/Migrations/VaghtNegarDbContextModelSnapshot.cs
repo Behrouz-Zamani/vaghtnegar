@@ -65,6 +65,27 @@ partial class VaghtNegarDbContextModelSnapshot : ModelSnapshot
             entity.ToTable("Doctors");
         });
 
+        modelBuilder.Entity<VaghtNegar.Domain.Entities.DoctorWorkingHour>(entity =>
+        {
+            entity.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("uniqueidentifier");
+            entity.Property<Guid>("DoctorId").HasColumnType("uniqueidentifier");
+            entity.Property<DayOfWeek>("DayOfWeek").HasConversion<int>().HasColumnType("int");
+            entity.Property<TimeOnly>("StartTime").HasColumnType("time");
+            entity.Property<TimeOnly>("EndTime").HasColumnType("time");
+            entity.Property<int>("SlotDurationMinutes").HasColumnType("int");
+            entity.Property<bool>("IsActive").HasColumnType("bit");
+            entity.HasKey("Id");
+            entity.HasIndex("DoctorId", "DayOfWeek", "StartTime");
+            entity.ToTable("DoctorWorkingHours");
+        });
+
+        modelBuilder.Entity<VaghtNegar.Domain.Entities.DoctorWorkingHour>()
+            .HasOne<VaghtNegar.Domain.Entities.Doctor>()
+            .WithMany()
+            .HasForeignKey("DoctorId")
+            .OnDelete(DeleteBehavior.Cascade)
+            .IsRequired();
+
         modelBuilder.Entity<VaghtNegar.Domain.Entities.Patient>(entity =>
         {
             entity.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("uniqueidentifier");
