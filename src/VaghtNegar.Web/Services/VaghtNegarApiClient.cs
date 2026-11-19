@@ -50,16 +50,13 @@ public sealed class VaghtNegarApiClient(IJSRuntime jsRuntime)
     public Task<AdminMutationResult> LinkDoctorIdentityAsync(Guid id, string? identityUserId, CancellationToken ct = default) =>
         SendAsync("PUT", $"bff/api/v1/doctors/{id}/identity", new { identityUserId }, ct);
 
+    public Task<ApiReadResult<AdminDoctorItem>> GetMyDoctorResultAsync(CancellationToken ct = default) =>
+        TryGetItemResultAsync<AdminDoctorItem>("bff/api/v1/me/doctor", ct, allowNotFound: true);
+
     public async Task<AdminDoctorItem?> GetMyDoctorAsync(CancellationToken ct = default)
     {
-        try
-        {
-            var response = await GetAsync("bff/api/v1/me/doctor", ct);
-            if (response.Status is < 200 or >= 300) return null;
-            return JsonSerializer.Deserialize<AdminDoctorItem>(response.Body, JsonOptions);
-        }
-        catch (JSException) { return null; }
-        catch (JsonException) { return null; }
+        var result = await GetMyDoctorResultAsync(ct);
+        return result.Succeeded ? result.Data : null;
     }
 
     public async Task<PatientProfileDto?> GetMyPatientProfileAsync(CancellationToken ct = default)
@@ -92,8 +89,21 @@ public sealed class VaghtNegarApiClient(IJSRuntime jsRuntime)
     public Task<AdminMutationResult> BookMyAppointmentAsync(Guid doctorId, DateTimeOffset startsAtUtc, string? patientNote, CancellationToken ct = default) =>
         SendAsync("POST", $"bff/api/v1/doctors/{doctorId}/appointments", new { startsAtUtc, patientNote }, ct);
 
-    public async Task<List<WorkingHourItem>> GetMyWorkingHoursAsync(CancellationToken ct = default) =>
-        await TryGetCollectionAsync<WorkingHourItem>("bff/api/v1/me/doctor/schedule/working-hours", ct);
+    public Task<ApiReadResult<List<WorkingHourItem>>> GetMyWorkingHoursResultAsync(CancellationToken ct = default) =>
+        TryGetCollectionResultAsync<WorkingHourItem>("bff/api/v1/me/doctor/schedule/working-hours", ct);
+
+    public async Task<List<WorkingHourItem>> GetMyWorkingHoursAsync(CancellationToken ct = default)
+    {
+        var result = await GetMyWorkingHoursResultAsync(ct);
+        return result.Succeeded && result.Data is not null ? result.Data : [];
+    }
+
+    public Task<ApiReadResult<List<AvailableSlotItem>>> GetAvailableSlotsResultAsync(
+        Guid doctorId, string jalaliDate, CancellationToken ct = default)
+    {
+        var path = $"bff/api/v1/doctors/{doctorId}/schedule/available-slots?date={Uri.EscapeDataString(jalaliDate)}";
+        return TryGetCollectionResultAsync<AvailableSlotItem>(path, ct);
+    }
 
     public Task<AdminMutationResult> ReplaceMyWorkingHoursAsync(
         IReadOnlyList<WorkingHourInputItem> items, CancellationToken ct = default) =>
@@ -169,6 +179,31 @@ public sealed class VaghtNegarApiClient(IJSRuntime jsRuntime)
         // Send an explicit empty JSON object so the BFF forwards a PATCH body
         // consistently across browsers and hosting environments.
         return SendAsync("PATCH", $"bff/api/v1/appointments/{id}/{action}", new Dictionary<string, object>(), ct);
+    }
+
+    private async Task<ApiReadResult<T>> TryGetItemResultAsync<T>(
+        string path, CancellationToken ct, bool allowNotFound = false) where T : class
+    {
+        try
+        {
+            var response = await GetAsync(path, ct);
+            if (response.Status == 404 && allowNotFound)
+                return new ApiReadResult<T>(false, null, null, true);
+            if (response.Status is < 200 or >= 300)
+                return new ApiReadResult<T>(false, null, ReadError(response.Body, response.Status));
+            var item = JsonSerializer.Deserialize<T>(response.Body, JsonOptions);
+            return item is null
+                ? new ApiReadResult<T>(false, null, "پاسخ دریافتی از سرور خالی است.")
+                : new ApiReadResult<T>(true, item, null);
+        }
+        catch (JSException)
+        {
+            return new ApiReadResult<T>(false, null, "ارتباط با سرور برقرار نشد. اتصال API را بررسی کنید.");
+        }
+        catch (JsonException)
+        {
+            return new ApiReadResult<T>(false, null, "پاسخ دریافتی از سرور قابل پردازش نیست.");
+        }
     }
 
     private async Task<ApiReadResult<List<T>>> TryGetCollectionResultAsync<T>(string path, CancellationToken ct)
@@ -322,7 +357,7 @@ public sealed class VaghtNegarApiClient(IJSRuntime jsRuntime)
     }
 }
 
-public sealed record ApiReadResult<T>(bool Succeeded, T? Data, string? Error);
+public sealed record ApiReadResult<T>(bool Succeeded, T? Data, string? Error, bool NotFound = false);
 public sealed record BrowserApiResponse(int Status, string Body);
 public sealed record ApiDashboardSummary(int ClinicCount, int DoctorCount, IReadOnlyList<string> Clinics, IReadOnlyList<string> Doctors);
 public sealed record ApiCallResult(bool Succeeded, string? Error, IReadOnlyList<AppointmentListItem> Appointments, int Page, int TotalCount, int TotalPages);
