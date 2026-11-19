@@ -56,6 +56,36 @@ public sealed class VaghtNegarApiClient(IJSRuntime jsRuntime)
         catch (JsonException) { return null; }
     }
 
+    public async Task<PatientProfileDto?> GetMyPatientProfileAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            var response = await GetAsync("bff/api/v1/me/patient", ct);
+            if (response.Status is < 200 or >= 300) return null;
+            return JsonSerializer.Deserialize<PatientProfileDto>(response.Body, JsonOptions);
+        }
+        catch (JSException) { return null; }
+        catch (JsonException) { return null; }
+    }
+
+    public async Task<PatientAppointmentsPageDto?> GetMyAppointmentsAsync(int page = 1, CancellationToken ct = default)
+    {
+        try
+        {
+            var response = await GetAsync($"bff/api/v1/me/appointments?page={page}&pageSize=20", ct);
+            if (response.Status is < 200 or >= 300) return null;
+            return JsonSerializer.Deserialize<PatientAppointmentsPageDto>(response.Body, JsonOptions);
+        }
+        catch (JSException) { return null; }
+        catch (JsonException) { return null; }
+    }
+
+    public Task<AdminMutationResult> CancelMyAppointmentAsync(Guid id, CancellationToken ct = default) =>
+        SendAsync("PATCH", $"bff/api/v1/me/appointments/{id}/cancel", new Dictionary<string, object>(), ct);
+
+    public Task<AdminMutationResult> BookMyAppointmentAsync(Guid doctorId, DateTimeOffset startsAtUtc, string? patientNote, CancellationToken ct = default) =>
+        SendAsync("POST", $"bff/api/v1/doctors/{doctorId}/appointments", new { startsAtUtc, patientNote }, ct);
+
     public async Task<List<WorkingHourItem>> GetMyWorkingHoursAsync(CancellationToken ct = default) =>
         await TryGetCollectionAsync<WorkingHourItem>("bff/api/v1/me/doctor/schedule/working-hours", ct);
 
@@ -273,3 +303,7 @@ public sealed record AvailableSlotItem(string JalaliDate, string DayName, string
 
 public sealed record WorkingHourItem(Guid Id, Guid DoctorId, int DayOfWeek, string DayName, string StartTime, string EndTime, int SlotDurationMinutes, bool IsActive);
 public sealed record WorkingHourInputItem(int DayOfWeek, string StartTime, string EndTime, int SlotDurationMinutes);
+
+public sealed record PatientProfileDto(Guid Id, string FirstName, string LastName, string MobileNumber, DateOnly? BirthDate);
+public sealed record PatientAppointmentDto(Guid Id, Guid ClinicId, Guid DoctorId, string DoctorFullName, DateTimeOffset StartsAtUtc, DateTimeOffset EndsAtUtc, string Status, string? PatientNote, DateTimeOffset CreatedAtUtc);
+public sealed record PatientAppointmentsPageDto(IReadOnlyList<PatientAppointmentDto> Items, int Page, int PageSize, int TotalCount, int TotalPages);
