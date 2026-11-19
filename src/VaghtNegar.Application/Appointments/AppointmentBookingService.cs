@@ -5,7 +5,8 @@ namespace VaghtNegar.Application.Appointments;
 
 public sealed class AppointmentBookingService(
     ISchedulingRepository schedulingRepository,
-    IAppointmentBookingRepository bookingRepository)
+    IAppointmentBookingRepository bookingRepository,
+    SchedulingService schedulingService)
 {
     public async Task<AppointmentBookingDto> BookAsync(
         Guid doctorId,
@@ -13,16 +14,9 @@ public sealed class AppointmentBookingService(
         BookAppointmentRequest request,
         CancellationToken cancellationToken)
     {
-        if (doctorId == Guid.Empty)
-            throw new ArgumentException("شناسه پزشک معتبر نیست.");
+        ValidateBookingInput(doctorId, request.StartsAtUtc, request.PatientNote);
         if (string.IsNullOrWhiteSpace(identityUserId))
             throw new ArgumentException("شناسه کاربر احراز هویت‌شده معتبر نیست.");
-        if (request.StartsAtUtc.Offset != TimeSpan.Zero)
-            throw new ArgumentException("زمان شروع باید با UTC و پسوند +00:00 ارسال شود.");
-        if (request.StartsAtUtc <= DateTimeOffset.UtcNow)
-            throw new ArgumentException("امکان رزرو زمان گذشته وجود ندارد.");
-        if (request.PatientNote?.Length > 1000)
-            throw new ArgumentException("توضیحات بیمار حداکثر می‌تواند ۱۰۰۰ کاراکتر باشد.");
 
         if (!await schedulingRepository.DoctorExistsAsync(doctorId, cancellationToken))
             throw new DoctorForScheduleNotFoundException();
@@ -51,13 +45,57 @@ public sealed class AppointmentBookingService(
         var endsAtUtc = new DateTimeOffset(TimeZoneInfo.ConvertTimeToUtc(endLocalDateTime, zone), TimeSpan.Zero);
 
         var result = await bookingRepository.TryBookAsync(
+            doctorId, identityUserId.Trim(), request.StartsAtUtc, endsAtUtc, request.PatientNote, cancellationToken);
+
+        return MapBookingResult(result);
+    }
+
+    public async Task<AppointmentBookingDto> BookForPatientAsync(
+        Guid doctorId,
+        StaffBookAppointmentRequest request,
+        CancellationToken cancellationToken)
+    {
+        ValidateBookingInput(doctorId, request.StartsAtUtc, request.PatientNote);
+        if (request.PatientId == Guid.Empty)
+            throw new ArgumentException("انتخاب بیمار الزامی است.");
+
+        var zone = GetTehranTimeZone();
+        var localStart = TimeZoneInfo.ConvertTime(request.StartsAtUtc, zone);
+        var localDate = DateOnly.FromDateTime(localStart.DateTime);
+        var jalaliDate = SchedulingService.FormatJalaliDate(localDate);
+
+        var availableSlots = await schedulingService.GetAvailableSlotsAsync(
+            doctorId, jalaliDate, cancellationToken);
+
+        var selectedSlot = availableSlots.FirstOrDefault(x => x.StartsAtUtc == request.StartsAtUtc);
+        if (selectedSlot is null)
+            throw new AppointmentSlotUnavailableException();
+
+        var result = await bookingRepository.TryBookForPatientAsync(
             doctorId,
-            identityUserId.Trim(),
-            request.StartsAtUtc,
-            endsAtUtc,
+            request.PatientId,
+            selectedSlot.StartsAtUtc,
+            selectedSlot.EndsAtUtc,
             request.PatientNote,
             cancellationToken);
 
+        return MapBookingResult(result);
+    }
+
+    private static void ValidateBookingInput(Guid doctorId, DateTimeOffset startsAtUtc, string? patientNote)
+    {
+        if (doctorId == Guid.Empty)
+            throw new ArgumentException("شناسه پزشک معتبر نیست.");
+        if (startsAtUtc.Offset != TimeSpan.Zero)
+            throw new ArgumentException("زمان شروع باید با UTC و پسوند +00:00 ارسال شود.");
+        if (startsAtUtc <= DateTimeOffset.UtcNow)
+            throw new ArgumentException("امکان رزرو زمان گذشته وجود ندارد.");
+        if (patientNote?.Length > 1000)
+            throw new ArgumentException("توضیحات بیمار حداکثر می‌تواند ۱۰۰۰ کاراکتر باشد.");
+    }
+
+    private static AppointmentBookingDto MapBookingResult(AppointmentBookingResult result)
+    {
         if (result.Failure == AppointmentBookingFailure.DoctorNotFound)
             throw new DoctorForScheduleNotFoundException();
         if (result.Failure == AppointmentBookingFailure.PatientNotFound)
@@ -65,12 +103,12 @@ public sealed class AppointmentBookingService(
         if (result.Failure == AppointmentBookingFailure.SlotUnavailable || result.Appointment is null)
             throw new AppointmentSlotUnavailableException();
 
-        return ToDto(result.Appointment);
+        var appointment = result.Appointment;
+        return new AppointmentBookingDto(
+            appointment.Id, appointment.ClinicId, appointment.DoctorId, appointment.PatientId,
+            appointment.StartsAtUtc, appointment.EndsAtUtc, appointment.Status.ToString(),
+            appointment.PatientNote, appointment.CreatedAtUtc);
     }
-
-    private static AppointmentBookingDto ToDto(Appointment x) =>
-        new(x.Id, x.ClinicId, x.DoctorId, x.PatientId, x.StartsAtUtc, x.EndsAtUtc,
-            x.Status.ToString(), x.PatientNote, x.CreatedAtUtc);
 
     private static TimeZoneInfo GetTehranTimeZone()
     {
@@ -79,5 +117,5 @@ public sealed class AppointmentBookingService(
     }
 }
 
-public sealed class PatientForBookingNotFoundException() : Exception("پرونده فعال و متصل به حساب کاربری شما یافت نشد.");
+public sealed class PatientForBookingNotFoundException() : Exception("پرونده فعال بیمار یافت نشد.");
 public sealed class AppointmentSlotUnavailableException() : Exception("این زمان قبلاً رزرو شده یا دیگر در دسترس نیست.");
