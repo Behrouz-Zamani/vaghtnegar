@@ -146,6 +146,7 @@ app.MapGet("/api/v1/auth/me", (ClaimsPrincipal user) =>
 
 app.MapClinicEndpoints();
 app.MapDoctorEndpoints();
+app.MapDoctorPortalEndpoints();
 app.MapPatientEndpoints();
 app.MapSchedulingEndpoints();
 app.MapAppointmentBookingEndpoints();
