@@ -39,36 +39,76 @@ else
             <div><span class="eyebrow">تنظیمات نوبت‌دهی</span><h2>برنامه کاری هفتگی</h2></div>
             <span class="count-chip">@scheduleDays.Values.Count(x => x.IsActive) روز فعال</span>
         </div>
-        <p class="doctor-help">روزهای حضور، ساعت شروع و پایان و مدت هر ویزیت را مشخص کنید. ساعت‌های آزاد بر اساس این برنامه ساخته می‌شوند و پس از رزرو، دیگر به‌عنوان ساعت آزاد نمایش داده نمی‌شوند.</p>
+        <p class="doctor-help">برای هر روز می‌توانید حداکثر چهار بازه کاری (مثلاً صبح و عصر) تعریف کنید. بازه‌های یک روز نباید با هم تداخل داشته باشند.</p>
 
         <div class="doctor-week-grid">
             @foreach (var day in WeekDays)
             {
                 var item = scheduleDays[day.Day];
                 <div class="doctor-day-row @(item.IsActive ? "enabled" : "")">
-                    <label class="doctor-day-toggle">
-                        <input type="checkbox" @bind="item.IsActive" />
-                        <strong>@day.Name</strong>
-                    </label>
-                    <label class="doctor-time-field">
-                        <span>از ساعت</span>
-                        <input class="admin-input" type="time" @bind="item.StartTime" disabled="@(!item.IsActive)" />
-                    </label>
-                    <label class="doctor-time-field">
-                        <span>تا ساعت</span>
-                        <input class="admin-input" type="time" @bind="item.EndTime" disabled="@(!item.IsActive)" />
-                    </label>
-                    <label class="doctor-time-field doctor-duration">
-                        <span>مدت ویزیت</span>
-                        <select class="admin-input" @bind="item.SlotDurationMinutes" disabled="@(!item.IsActive)">
-                            <option value="10">۱۰ دقیقه</option>
-                            <option value="15">۱۵ دقیقه</option>
-                            <option value="20">۲۰ دقیقه</option>
-                            <option value="30">۳۰ دقیقه</option>
-                            <option value="45">۴۵ دقیقه</option>
-                            <option value="60">۶۰ دقیقه</option>
-                        </select>
-                    </label>
+                    <div class="doctor-day-toggle">
+                        <label>
+                            <input type="checkbox" @bind="item.IsActive" />
+                            <strong>@day.Name</strong>
+                        </label>
+                    </div>
+
+                    <div class="doctor-day-ranges">
+                        @if (item.IsActive)
+                        {
+                            @if (item.Ranges.Count == 0)
+                            {
+                                <div class="empty-inline">هنوز بازه‌ای برای این روز ثبت نشده است.</div>
+                            }
+
+                            @foreach (var range in item.Ranges)
+                            {
+                                <div class="doctor-range-row">
+                                    <label class="doctor-time-field">
+                                        <span>از ساعت</span>
+                                        <input class="admin-input"
+                                               type="time"
+                                               value="@range.StartTime"
+                                               @onchange="e => range.StartTime = e.Value?.ToString() ?? string.Empty" />
+                                    </label>
+                                    <label class="doctor-time-field">
+                                        <span>تا ساعت</span>
+                                        <input class="admin-input"
+                                               type="time"
+                                               value="@range.EndTime"
+                                               @onchange="e => range.EndTime = e.Value?.ToString() ?? string.Empty" />
+                                    </label>
+                                    <label class="doctor-time-field doctor-duration">
+                                        <span>مدت ویزیت</span>
+                                        <select class="admin-input" @bind="range.SlotDurationMinutes">
+                                            <option value="10">۱۰ دقیقه</option>
+                                            <option value="15">۱۵ دقیقه</option>
+                                            <option value="20">۲۰ دقیقه</option>
+                                            <option value="30">۳۰ دقیقه</option>
+                                            <option value="45">۴۵ دقیقه</option>
+                                            <option value="60">۶۰ دقیقه</option>
+                                        </select>
+                                    </label>
+                                    <button type="button"
+                                            class="btn btn-outline doctor-remove-range"
+                                            title="حذف این بازه"
+                                            @onclick="() => RemoveRange(day.Day, range)">
+                                        حذف
+                                    </button>
+                                </div>
+                            }
+                            <button type="button"
+                                    class="btn btn-outline doctor-add-range"
+                                    disabled="@(item.Ranges.Count >= 4)"
+                                    @onclick="() => AddRange(day.Day)">
+                                + افزودن بازه @(item.Ranges.Count >= 4 ? "(حداکثر ۴ بازه)" : "")
+                            </button>
+                        }
+                        else
+                        {
+                            <span class="empty-inline">این روز در برنامه کاری پزشک نیست.</span>
+                        }
+                    </div>
                 </div>
             }
         </div>
@@ -135,63 +175,145 @@ else
     private async Task LoadAsync()
     {
         loading = true;
+        feedback = null;
+
         doctor = await ApiClient.GetMyDoctorAsync();
         if (doctor is not null)
         {
             var hours = await ApiClient.GetMyWorkingHoursAsync();
+
             foreach (var day in scheduleDays.Values)
             {
                 day.IsActive = false;
-                day.StartTime = "09:00";
-                day.EndTime = "17:00";
-                day.SlotDurationMinutes = 20;
+                day.Ranges.Clear();
             }
 
             foreach (var group in hours.GroupBy(x => x.DayOfWeek))
             {
-                var first = group.OrderBy(x => x.StartTime).First();
-                if (!scheduleDays.TryGetValue(group.Key, out var day)) continue;
+                if (!scheduleDays.TryGetValue(group.Key, out var day))
+                    continue;
+
                 day.IsActive = true;
-                day.StartTime = first.StartTime;
-                day.EndTime = first.EndTime;
-                day.SlotDurationMinutes = first.SlotDurationMinutes;
+                foreach (var hour in group.OrderBy(x => x.StartTime))
+                {
+                    day.Ranges.Add(new WorkingRangeForm
+                    {
+                        StartTime = hour.StartTime,
+                        EndTime = hour.EndTime,
+                        SlotDurationMinutes = hour.SlotDurationMinutes
+                    });
+                }
             }
         }
+
         loading = false;
+    }
+
+    private void AddRange(int dayOfWeek)
+    {
+        if (!scheduleDays.TryGetValue(dayOfWeek, out var day) || day.Ranges.Count >= 4)
+            return;
+
+        var start = day.Ranges.Count == 0 ? "09:00" : day.Ranges[^1].EndTime;
+        var end = "17:00";
+
+        if (TimeOnly.TryParse(start, out var parsedStart) &&
+            TimeOnly.TryParse(end, out var parsedEnd) &&
+            parsedStart >= parsedEnd)
+        {
+            start = "13:00";
+            end = "17:00";
+        }
+
+        day.Ranges.Add(new WorkingRangeForm
+        {
+            StartTime = start,
+            EndTime = end,
+            SlotDurationMinutes = 20
+        });
+    }
+
+    private void RemoveRange(int dayOfWeek, WorkingRangeForm range)
+    {
+        if (scheduleDays.TryGetValue(dayOfWeek, out var day))
+            day.Ranges.Remove(range);
     }
 
     private async Task SaveScheduleAsync()
     {
         var items = new List<WorkingHourInputItem>();
+
         foreach (var entry in scheduleDays)
         {
             var day = entry.Value;
-            if (!day.IsActive) continue;
-            if (!TimeOnly.TryParse(day.StartTime, out var start) ||
-                !TimeOnly.TryParse(day.EndTime, out var end) || start >= end)
+            if (!day.IsActive)
+                continue;
+
+            var dayName = WeekDays.First(x => x.Day == entry.Key).Name;
+            if (day.Ranges.Count == 0)
             {
-                ShowFeedback($"ساعت شروع و پایان روز {WeekDays.First(x => x.Day == entry.Key).Name} معتبر نیست.", true);
+                ShowFeedback($"برای روز {dayName} حداقل یک بازه کاری تعریف کنید یا آن روز را غیرفعال کنید.", true);
                 return;
             }
-            items.Add(new WorkingHourInputItem(entry.Key, start.ToString("HH:mm"), end.ToString("HH:mm"), day.SlotDurationMinutes));
+
+            if (day.Ranges.Count > 4)
+            {
+                ShowFeedback($"برای روز {dayName} حداکثر چهار بازه کاری مجاز است.", true);
+                return;
+            }
+
+            var parsedRanges = new List<(TimeOnly Start, TimeOnly End, int Duration)>();
+            foreach (var range in day.Ranges)
+            {
+                if (!TimeOnly.TryParse(range.StartTime, out var start) ||
+                    !TimeOnly.TryParse(range.EndTime, out var end) ||
+                    start >= end)
+                {
+                    ShowFeedback($"ساعت شروع و پایان یکی از بازه‌های روز {dayName} معتبر نیست.", true);
+                    return;
+                }
+
+                parsedRanges.Add((start, end, range.SlotDurationMinutes));
+            }
+
+            var ordered = parsedRanges.OrderBy(x => x.Start).ToArray();
+            for (var i = 1; i < ordered.Length; i++)
+            {
+                if (ordered[i].Start < ordered[i - 1].End)
+                {
+                    ShowFeedback($"بازه‌های کاری روز {dayName} با هم تداخل دارند.", true);
+                    return;
+                }
+            }
+
+            foreach (var range in ordered)
+            {
+                items.Add(new WorkingHourInputItem(
+                    entry.Key,
+                    range.Start.ToString("HH:mm"),
+                    range.End.ToString("HH:mm"),
+                    range.Duration));
+            }
         }
 
         if (items.Count == 0)
         {
-            ShowFeedback("حداقل یک روز کاری را فعال کنید.", true);
+            ShowFeedback("حداقل یک بازه کاری در یکی از روزها تعریف کنید.", true);
             return;
         }
 
         saving = true;
         var result = await ApiClient.ReplaceMyWorkingHoursAsync(items);
         saving = false;
+
         if (!result.Succeeded)
         {
             ShowFeedback(result.Message, true);
             return;
         }
+
         slotsLoaded = false;
-        ShowFeedback("برنامه کاری با موفقیت ذخیره شد. ساعت‌های آزاد برای پذیرش قابل دریافت هستند.", false);
+        ShowFeedback("برنامه کاری با موفقیت ذخیره شد. تمام بازه‌ها برای نوبت‌دهی فعال شدند.", false);
     }
 
     private async Task LoadSlotsAsync()
@@ -201,6 +323,7 @@ else
             ShowFeedback("تاریخ شمسی را وارد کنید؛ نمونه: ۱۴۰۵/۰۹/۰۱", true);
             return;
         }
+
         loadingSlots = true;
         slotsLoaded = false;
         availableSlots = await ApiClient.GetAvailableSlotsAsync(doctor!.Id, NormalizeDigits(jalaliDate));
@@ -225,8 +348,13 @@ else
     private sealed class DayScheduleForm
     {
         public bool IsActive { get; set; }
+        public List<WorkingRangeForm> Ranges { get; } = [];
+    }
+
+    private sealed class WorkingRangeForm
+    {
         public string StartTime { get; set; } = "09:00";
-        public string EndTime { get; set; } = "17:00";
+        public string EndTime { get; set; } = "12:00";
         public int SlotDurationMinutes { get; set; } = 20;
     }
 }
