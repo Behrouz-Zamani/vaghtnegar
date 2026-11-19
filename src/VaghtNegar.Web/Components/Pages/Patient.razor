@@ -33,7 +33,7 @@ else
         </div>
         <div class="patient-profile-meta">
             <small>تاریخ تولد</small>
-            <strong>@(profile.BirthDate?.ToString("yyyy/MM/dd") ?? "ثبت نشده")</strong>
+            <strong>@FormatBirthDate(profile.BirthDate)</strong>
         </div>
     </section>
 
@@ -252,6 +252,14 @@ else
         "Completed" => "completed",
         _ => ""
     };
+
+    private static string FormatBirthDate(DateOnly? value)
+    {
+        if (value is null) return "ثبت نشده";
+        var calendar = new PersianCalendar();
+        var date = value.Value.ToDateTime(TimeOnly.MinValue);
+        return $"{calendar.GetYear(date):0000}/{calendar.GetMonth(date):00}/{calendar.GetDayOfMonth(date):00}";
+    }
 
     private static string FormatTehran(DateTimeOffset value)
     {
