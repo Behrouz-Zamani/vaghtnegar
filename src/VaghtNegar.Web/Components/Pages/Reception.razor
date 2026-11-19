@@ -20,12 +20,21 @@
         <div><span class="eyebrow">پرونده‌ها</span><h2>جست‌وجوی بیمار</h2></div>
     </div>
     <div class="reception-search-row">
-        <input class="admin-input" placeholder="نام، نام خانوادگی یا شماره موبایل بیمار" @bind="patientSearch" @bind:event="oninput" />
+        <input class="admin-input" placeholder="حداقل ۳ حرف از نام، نام خانوادگی یا موبایل را وارد کنید" value="@patientSearch" @oninput="OnPatientSearchInput" />
         <button class="btn btn-primary" disabled="@searchingPatients" @onclick="SearchPatientsAsync">@(searchingPatients ? "در حال جست‌وجو..." : "جست‌وجو")</button>
         <button class="btn btn-outline" @onclick="OpenNewPatient">ثبت بیمار جدید</button>
     </div>
 
-    @if (patientMatches.Count > 0)
+    @if (searchingPatients)
+    {
+        <div class="loading-line"><span></span> در حال جست‌وجوی بیمار...</div>
+    }
+    else if (patientSearch.Trim().Length < 3 && selectedPatient is null)
+    {
+        <p class="form-hint">برای نمایش بیماران، حداقل ۳ حرف از نام یا نام خانوادگی را وارد کنید. جست‌وجو به‌صورت خودکار انجام می‌شود.</p>
+    }
+
+    @if (patientMatches.Count > 0 && selectedPatient is null)
     {
         <div class="patient-results">
             @foreach (var patient in patientMatches)
@@ -223,6 +232,7 @@
     private bool loadingSlots;
     private bool searchingPatients;
     private bool patientsSearched;
+    private CancellationTokenSource? patientSearchCts;
     private bool slotsLoaded;
     private bool newPatientOpen;
     private bool saving;
@@ -243,19 +253,80 @@
         StateHasChanged();
     }
 
+    private async Task OnPatientSearchInput(ChangeEventArgs e)
+    {
+        patientSearch = e.Value?.ToString() ?? "";
+        selectedPatient = null;
+        selectedPatientId = null;
+        patientMatches = [];
+        patientsSearched = false;
+
+        patientSearchCts?.Cancel();
+        patientSearchCts?.Dispose();
+        patientSearchCts = new CancellationTokenSource();
+        var cancellationToken = patientSearchCts.Token;
+        var searchTerm = patientSearch.Trim();
+
+        if (searchTerm.Length < 3)
+        {
+            searchingPatients = false;
+            return;
+        }
+
+        searchingPatients = true;
+        try
+        {
+            await Task.Delay(350, cancellationToken);
+            var matches = await ApiClient.GetPatientsAsync(searchTerm, cancellationToken);
+            if (cancellationToken.IsCancellationRequested) return;
+
+            patientMatches = matches.Where(x => x.IsActive).ToList();
+            patientsSearched = true;
+        }
+        catch (OperationCanceledException)
+        {
+            // A newer keystroke has started another search.
+        }
+        finally
+        {
+            if (!cancellationToken.IsCancellationRequested)
+                searchingPatients = false;
+        }
+    }
+
     private async Task SearchPatientsAsync()
     {
+        patientSearchCts?.Cancel();
+        patientSearchCts?.Dispose();
+        patientSearchCts = null;
+
+        if (patientSearch.Trim().Length < 3)
+        {
+            patientMatches = [];
+            patientsSearched = false;
+            searchingPatients = false;
+            return;
+        }
+
         searchingPatients = true;
         patientsSearched = false;
-        patientMatches = (await ApiClient.GetPatientsAsync(patientSearch)).Where(x => x.IsActive).ToList();
+        patientMatches = (await ApiClient.GetPatientsAsync(patientSearch.Trim()))
+            .Where(x => x.IsActive).ToList();
         patientsSearched = true;
         searchingPatients = false;
     }
 
     private void SelectPatient(PatientListItem patient)
     {
+        patientSearchCts?.Cancel();
+        patientSearchCts?.Dispose();
+        patientSearchCts = null;
         selectedPatient = patient;
         selectedPatientId = patient.Id;
+        patientSearch = $"{patient.FirstName} {patient.LastName}";
+        patientMatches = [];
+        patientsSearched = false;
+        searchingPatients = false;
         feedback = null;
     }
 
@@ -263,6 +334,9 @@
     {
         selectedPatient = null;
         selectedPatientId = null;
+        patientSearch = "";
+        patientMatches = [];
+        patientsSearched = false;
     }
 
     private void OpenNewPatient()
