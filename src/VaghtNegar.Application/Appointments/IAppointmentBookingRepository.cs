@@ -9,4 +9,12 @@ public interface IAppointmentBookingRepository
         DateTimeOffset endsAtUtc,
         string? patientNote,
         CancellationToken cancellationToken);
+
+    Task<AppointmentBookingResult> TryBookForPatientAsync(
+        Guid doctorId,
+        Guid patientId,
+        DateTimeOffset startsAtUtc,
+        DateTimeOffset endsAtUtc,
+        string? patientNote,
+        CancellationToken cancellationToken);
 }
