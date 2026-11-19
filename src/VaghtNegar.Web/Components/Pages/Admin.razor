@@ -73,7 +73,7 @@ else
 
     <section class="panel-card admin-section">
         <div class="panel-heading">
-            <div><span class="eyebrow">کادر درمان</span><h2>مدیریت پزشکان</h2></div>
+            <div><span class="eyebrow">کادر درمان</span><h2>مدیریت پزشکان</h2><p class="doctor-help">برای فعال‌سازی پنل پزشک، شناسه sub کاربر Keycloak را در ردیف پزشک وارد و اتصال را انتخاب کنید.</p></div>
             <button class="btn btn-primary" disabled="@(clinics.All(x => !x.IsActive))" @onclick="NewDoctor">＋ افزودن پزشک</button>
         </div>
         @if (doctorEditorOpen)
@@ -256,6 +256,8 @@ else
         var subject = identityUserIds.GetValueOrDefault(doctor.Id, "").Trim();
         if (string.IsNullOrWhiteSpace(subject))
         {
+            ShowFeedback("شناسه sub حساب Keycloak پزشک را وارد کنید.", true);
+            return;
         }
         saving = true;
         var result = await ApiClient.LinkDoctorIdentityAsync(doctor.Id, subject);
