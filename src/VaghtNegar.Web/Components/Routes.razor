@@ -1,3 +1,5 @@
+@inject NavigationManager Navigation
+
 <Router AppAssembly="typeof(Program).Assembly">
     <Found Context="routeData">
         <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(MainLayout)">
@@ -22,7 +24,7 @@
                             <h1>برای مشاهده این بخش وارد شوید</h1>
                             <p>برای دسترسی به امکانات وقت‌نگار، با حساب کاربری خود از طریق سامانه امن ورود اقدام کنید.</p>
                             <a class="btn btn-primary"
-                               href="@($"/account/login?returnUrl={Uri.EscapeDataString("/" + routeData.PageType.Name)}")"
+                               href="@($"/account/login?returnUrl={Uri.EscapeDataString("/" + Navigation.ToBaseRelativePath(Navigation.Uri))}")"
                                data-enhance-nav="false">ورود به وقت‌نگار</a>
                         </section>
                     }
