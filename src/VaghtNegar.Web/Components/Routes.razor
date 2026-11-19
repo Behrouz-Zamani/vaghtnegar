@@ -1,14 +1,31 @@
 <Router AppAssembly="typeof(Program).Assembly">
     <Found Context="routeData">
         <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(MainLayout)">
-            <NotAuthorized>
+            <NotAuthorized Context="authState">
                 <LayoutView Layout="typeof(MainLayout)">
-                    <section class="auth-required">
-                        <div class="auth-icon">⌑</div>
-                        <h1>برای مشاهده این بخش وارد شوید</h1>
-                        <p>برای دسترسی به امکانات وقت‌نگار، با حساب کاربری خود از طریق سامانه امن ورود اقدام کنید.</p>
-                        <a class="btn btn-primary" href="/account/login">ورود به وقت‌نگار</a>
-                    </section>
+                    @if (authState.User.Identity?.IsAuthenticated == true)
+                    {
+                        <section class="auth-required">
+                            <div class="auth-icon">⛔</div>
+                            <h1>شما اجازه دسترسی به این بخش را ندارید</h1>
+                            <p>
+                                حساب شما وارد سامانه شده است، اما نقش کاربری لازم برای مشاهده این صفحه را ندارد.
+                                برای صفحه پذیرش، یکی از نقش‌های Receptionist، ClinicAdmin یا SuperAdmin لازم است.
+                            </p>
+                            <a class="btn btn-outline" href="/">بازگشت به داشبورد</a>
+                        </section>
+                    }
+                    else
+                    {
+                        <section class="auth-required">
+                            <div class="auth-icon">⌑</div>
+                            <h1>برای مشاهده این بخش وارد شوید</h1>
+                            <p>برای دسترسی به امکانات وقت‌نگار، با حساب کاربری خود از طریق سامانه امن ورود اقدام کنید.</p>
+                            <a class="btn btn-primary"
+                               href="@($"/account/login?returnUrl={Uri.EscapeDataString("/" + routeData.PageType.Name)}")"
+                               data-enhance-nav="false">ورود به وقت‌نگار</a>
+                        </section>
+                    }
                 </LayoutView>
             </NotAuthorized>
         </AuthorizeRouteView>
