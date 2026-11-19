@@ -121,7 +121,7 @@ else
                                     <input class="admin-input" dir="ltr" placeholder="Keycloak sub" @bind="identityUserIds[doctor.Id]" />
                                     <button class="btn btn-outline btn-small" disabled="@saving" @onclick="() => LinkDoctorAccountAsync(doctor)">اتصال</button>
                                 </div>
-                                @if (!string.IsNullOrWhiteSpace(doctor.IdentityUserId))
+                                @if (doctor.HasLinkedIdentity)
                                 {
                                     <small class="linked-account">حساب متصل است</small>
                                 }
@@ -169,7 +169,7 @@ else
         await Task.WhenAll(clinicTask, doctorTask);
         clinics = await clinicTask;
         doctors = await doctorTask;
-        identityUserIds = doctors.ToDictionary(x => x.Id, x => x.IdentityUserId ?? "");
+        identityUserIds = doctors.ToDictionary(x => x.Id, _ => "");
         loading = false;
     }
 
@@ -256,8 +256,6 @@ else
         var subject = identityUserIds.GetValueOrDefault(doctor.Id, "").Trim();
         if (string.IsNullOrWhiteSpace(subject))
         {
-            ShowFeedback("ابتدا شناسه sub کاربر پزشک را وارد کنید. برای قطع اتصال، مقدار را خالی بگذارید و دوباره اتصال را بزنید.", true);
-            return;
         }
         saving = true;
         var result = await ApiClient.LinkDoctorIdentityAsync(doctor.Id, subject);
