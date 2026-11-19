@@ -53,6 +53,23 @@ public static class DoctorEndpoints
         .RequireAuthorization(policy => policy.RequireRole(AdminRoles))
         .WithName("UpdateDoctor");
 
+        group.MapPut("/{id:guid}/identity", async (Guid id, LinkDoctorIdentityRequest request, DoctorService service, CancellationToken ct) =>
+        {
+            if (request.IdentityUserId?.Length > 128)
+                return Results.ValidationProblem(new Dictionary<string, string[]> { ["identityUserId"] = ["شناسه حساب حداکثر ۱۲۸ کاراکتر است."] });
+            try
+            {
+                var doctor = await service.LinkIdentityAsync(id, request.IdentityUserId, ct);
+                return doctor is null ? Results.NotFound() : Results.Ok(doctor);
+            }
+            catch (DoctorIdentityAlreadyLinkedException ex)
+            {
+                return Results.Conflict(new { message = ex.Message });
+            }
+        })
+        .RequireAuthorization(policy => policy.RequireRole(AdminRoles))
+        .WithName("LinkDoctorIdentity");
+
         group.MapPatch("/{id:guid}/active", async (Guid id, SetDoctorActiveRequest request, DoctorService service, CancellationToken ct) =>
         {
             var doctor = await service.SetActiveAsync(id, request.IsActive, ct);
@@ -80,3 +97,5 @@ public static class DoctorEndpoints
 public sealed record CreateDoctorRequest(Guid ClinicId, string FirstName, string LastName, string? MedicalCode);
 public sealed record UpdateDoctorRequest(string FirstName, string LastName, string? MedicalCode);
 public sealed record SetDoctorActiveRequest(bool IsActive);
+
+public sealed record LinkDoctorIdentityRequest(string? IdentityUserId);
