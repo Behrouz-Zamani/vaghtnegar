@@ -15,6 +15,14 @@
 {
     <div class="panel-card loading-line"><span></span> در حال دریافت اطلاعات پرونده...</div>
 }
+else if (profileLoadError is not null)
+{
+    <div class="notice-card" role="alert">
+        <strong>دریافت اطلاعات پرونده ناموفق بود.</strong>
+        <p>@profileLoadError</p>
+        <button class="btn btn-primary" @onclick="LoadAsync">تلاش مجدد</button>
+    </div>
+}
 else if (profile is null)
 {
     <div class="notice-card">
@@ -50,6 +58,13 @@ else
         @if (appointmentsLoading)
         {
             <div class="loading-line"><span></span> در حال دریافت نوبت‌ها...</div>
+        }
+        else if (appointmentsError is not null)
+        {
+            <div class="notice-card" role="alert">
+                <p>@appointmentsError</p>
+                <button class="btn btn-outline" @onclick="LoadAppointmentsAsync">تلاش مجدد</button>
+            </div>
         }
         else if (appointments.Items.Count == 0)
         {
@@ -94,6 +109,15 @@ else
         <div class="panel-heading">
             <div><span class="eyebrow">نوبت‌دهی آنلاین</span><h2>دریافت نوبت جدید</h2></div>
         </div>
+        @if (doctorsError is not null)
+        {
+            <div class="notice-card" role="alert">
+                <p>@doctorsError</p>
+                <button class="btn btn-outline" @onclick="LoadDoctorsAsync">تلاش مجدد</button>
+            </div>
+        }
+        else
+        {
         <div class="patient-booking-grid">
             <label>پزشک
                 <select class="admin-input" @bind="selectedDoctorId">
@@ -114,7 +138,14 @@ else
         <div class="patient-booking-actions">
             <button class="btn btn-primary" disabled="@loadingSlots" @onclick="LoadSlotsAsync">نمایش ساعت‌های آزاد</button>
         </div>
-        @if (slotsLoaded)
+        @if (slotsError is not null)
+        {
+            <div class="notice-card" role="alert">
+                <p>@slotsError</p>
+                <button class="btn btn-outline" @onclick="LoadSlotsAsync">تلاش مجدد</button>
+            </div>
+        }
+        @if (slotsLoaded && slotsError is null)
         {
             @if (availableSlots.Count == 0)
             {
@@ -139,6 +170,7 @@ else
                 }
             }
         }
+        }
     </section>
 }
 
@@ -159,31 +191,69 @@ else
     private Guid? cancellingId;
     private bool feedbackIsError;
     private string? feedback;
+    private string? profileLoadError;
+    private string? appointmentsError;
+    private string? doctorsError;
+    private string? slotsError;
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
     {
-        profile = await ApiClient.GetMyPatientProfileAsync();
+        loading = true;
+        profileLoadError = null;
+        var result = await ApiClient.GetMyPatientProfileResultAsync();
+        profile = result.Data;
+        if (!result.Succeeded && !result.NotFound)
+        {
+            profileLoadError = result.Error ?? "خطای نامشخص هنگام دریافت پرونده بیمار.";
+            loading = false;
+            return;
+        }
+
         if (profile is not null)
         {
-            await LoadAppointmentsAsync();
-            doctors = await ApiClient.GetDoctorsAsync();
-            doctors = doctors.Where(x => x.IsActive).ToList();
             jalaliDate = TodayJalali();
+            await LoadAppointmentsAsync();
+            await LoadDoctorsAsync();
         }
         loading = false;
+    }
+
+    private async Task LoadDoctorsAsync()
+    {
+        doctorsError = null;
+        var result = await ApiClient.GetDoctorsResultAsync();
+        if (!result.Succeeded || result.Data is null)
+        {
+            doctors = [];
+            doctorsError = result.Error ?? "دریافت فهرست پزشکان ناموفق بود.";
+            return;
+        }
+        doctors = result.Data.Where(x => x.IsActive).ToList();
     }
 
     private async Task LoadAppointmentsAsync()
     {
         appointmentsLoading = true;
-        appointments = await ApiClient.GetMyAppointmentsAsync(appointments.Page) ?? new([], 1, 20, 0, 0);
+        appointmentsError = null;
+        var result = await ApiClient.GetMyAppointmentsResultAsync(appointments.Page);
+        if (result.Succeeded && result.Data is not null)
+            appointments = result.Data;
+        else
+            appointmentsError = result.Error ?? "دریافت نوبت‌های شما ناموفق بود.";
         appointmentsLoading = false;
     }
 
     private async Task ChangePageAsync(int page)
     {
         appointmentsLoading = true;
-        appointments = await ApiClient.GetMyAppointmentsAsync(page) ?? appointments;
+        appointmentsError = null;
+        var result = await ApiClient.GetMyAppointmentsResultAsync(page);
+        if (result.Succeeded && result.Data is not null)
+            appointments = result.Data;
+        else
+            appointmentsError = result.Error ?? "دریافت نوبت‌های این صفحه ناموفق بود.";
         appointmentsLoading = false;
     }
 
@@ -211,8 +281,16 @@ else
         }
         loadingSlots = true;
         slotsLoaded = false;
+        slotsError = null;
         selectedSlot = null;
-        availableSlots = await ApiClient.GetAvailableSlotsAsync(doctorId, normalized);
+        var result = await ApiClient.GetAvailableSlotsResultAsync(doctorId, normalized);
+        if (result.Succeeded)
+            availableSlots = result.Data ?? [];
+        else
+        {
+            availableSlots = [];
+            slotsError = result.Error ?? "دریافت ساعت‌های آزاد ناموفق بود.";
+        }
         loadingSlots = false;
         slotsLoaded = true;
     }
