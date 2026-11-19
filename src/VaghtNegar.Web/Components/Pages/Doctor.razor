@@ -14,6 +14,14 @@
 {
     <div class="panel-card loading-line"><span></span> در حال دریافت اطلاعات پزشک و برنامه کاری...</div>
 }
+else if (loadError is not null)
+{
+    <div class="notice-card doctor-warning" role="alert">
+        <strong>دریافت اطلاعات پنل پزشک ناموفق بود.</strong>
+        <p>@loadError</p>
+        <button class="btn btn-primary" @onclick="LoadAsync">تلاش مجدد</button>
+    </div>
+}
 else if (doctor is null)
 {
     <div class="notice-card doctor-warning">
@@ -131,7 +139,14 @@ else
             </label>
             <button class="btn btn-outline" disabled="@loadingSlots" @onclick="LoadSlotsAsync">نمایش ساعت‌های آزاد</button>
         </div>
-        @if (slotsLoaded)
+        @if (slotsError is not null)
+        {
+            <div class="notice-card doctor-warning" role="alert">
+                <p>@slotsError</p>
+                <button class="btn btn-outline" @onclick="LoadSlotsAsync">تلاش مجدد</button>
+            </div>
+        }
+        @if (slotsLoaded && slotsError is null)
         {
             @if (availableSlots.Count == 0)
             {
@@ -168,6 +183,8 @@ else
     private bool slotsLoaded;
     private bool feedbackIsError;
     private string? feedback;
+    private string? loadError;
+    private string? slotsError;
     private string jalaliDate = "";
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
@@ -177,10 +194,26 @@ else
         loading = true;
         feedback = null;
 
-        doctor = await ApiClient.GetMyDoctorAsync();
+        loadError = null;
+        var doctorResult = await ApiClient.GetMyDoctorResultAsync();
+        doctor = doctorResult.Data;
+        if (!doctorResult.Succeeded && !doctorResult.NotFound)
+        {
+            loadError = doctorResult.Error ?? "خطای نامشخص هنگام دریافت اطلاعات پزشک.";
+            loading = false;
+            return;
+        }
+
         if (doctor is not null)
         {
-            var hours = await ApiClient.GetMyWorkingHoursAsync();
+            var hoursResult = await ApiClient.GetMyWorkingHoursResultAsync();
+            if (!hoursResult.Succeeded || hoursResult.Data is null)
+            {
+                loadError = hoursResult.Error ?? "دریافت برنامه کاری پزشک ناموفق بود.";
+                loading = false;
+                return;
+            }
+            var hours = hoursResult.Data;
 
             foreach (var day in scheduleDays.Values)
             {
@@ -326,7 +359,15 @@ else
 
         loadingSlots = true;
         slotsLoaded = false;
-        availableSlots = await ApiClient.GetAvailableSlotsAsync(doctor!.Id, NormalizeDigits(jalaliDate));
+        slotsError = null;
+        var result = await ApiClient.GetAvailableSlotsResultAsync(doctor!.Id, NormalizeDigits(jalaliDate));
+        if (result.Succeeded)
+            availableSlots = result.Data ?? [];
+        else
+        {
+            availableSlots = [];
+            slotsError = result.Error ?? "دریافت ساعت‌های آزاد ناموفق بود.";
+        }
         loadingSlots = false;
         slotsLoaded = true;
     }
