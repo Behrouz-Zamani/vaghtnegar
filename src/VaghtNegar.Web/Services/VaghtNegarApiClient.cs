@@ -41,6 +41,28 @@ public sealed class VaghtNegarApiClient(IJSRuntime jsRuntime)
     public Task<AdminMutationResult> SetDoctorActiveAsync(Guid id, bool isActive, CancellationToken ct = default) =>
         SendAsync("PATCH", $"bff/api/v1/doctors/{id}/active", new { isActive }, ct);
 
+    public Task<AdminMutationResult> LinkDoctorIdentityAsync(Guid id, string? identityUserId, CancellationToken ct = default) =>
+        SendAsync("PUT", $"bff/api/v1/doctors/{id}/identity", new { identityUserId }, ct);
+
+    public async Task<AdminDoctorItem?> GetMyDoctorAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            var response = await GetAsync("bff/api/v1/me/doctor", ct);
+            if (response.Status is < 200 or >= 300) return null;
+            return JsonSerializer.Deserialize<AdminDoctorItem>(response.Body, JsonOptions);
+        }
+        catch (JSException) { return null; }
+        catch (JsonException) { return null; }
+    }
+
+    public async Task<List<WorkingHourItem>> GetMyWorkingHoursAsync(CancellationToken ct = default) =>
+        await TryGetCollectionAsync<WorkingHourItem>("bff/api/v1/me/doctor/schedule/working-hours", ct);
+
+    public Task<AdminMutationResult> ReplaceMyWorkingHoursAsync(
+        IReadOnlyList<WorkingHourInputItem> items, CancellationToken ct = default) =>
+        SendAsync("PUT", "bff/api/v1/me/doctor/schedule/working-hours", new { items }, ct);
+
     public async Task<ApiCallResult> GetAppointmentsAsync(
         int page = 1,
         Guid? patientId = null,
@@ -245,6 +267,9 @@ public sealed record ApiCallResult(bool Succeeded, string? Error, IReadOnlyList<
 public sealed record AppointmentListItem(Guid Id, Guid DoctorId, Guid PatientId, string Doctor, string Patient, string MobileNumber, DateTimeOffset StartsAtUtc, DateTimeOffset EndsAtUtc, string StatusCode, string Status, string Time);
 public sealed record AdminMutationResult(bool Succeeded, string Message);
 public sealed record AdminClinicItem(Guid Id, string Name, string Slug, bool IsActive);
-public sealed record AdminDoctorItem(Guid Id, Guid ClinicId, string FirstName, string LastName, string? MedicalCode, bool IsActive);
+public sealed record AdminDoctorItem(Guid Id, Guid ClinicId, string FirstName, string LastName, string? MedicalCode, string? IdentityUserId, bool IsActive);
 public sealed record PatientListItem(Guid Id, string FirstName, string LastName, string MobileNumber, DateOnly? BirthDate, bool IsActive);
 public sealed record AvailableSlotItem(string JalaliDate, string DayName, string StartTime, string EndTime, DateTimeOffset StartsAtUtc, DateTimeOffset EndsAtUtc);
+
+public sealed record WorkingHourItem(Guid Id, Guid DoctorId, int DayOfWeek, string DayName, string StartTime, string EndTime, int SlotDurationMinutes, bool IsActive);
+public sealed record WorkingHourInputItem(int DayOfWeek, string StartTime, string EndTime, int SlotDurationMinutes);
