@@ -17,6 +17,13 @@ public sealed class DoctorRepository(VaghtNegarDbContext dbContext) : IDoctorRep
     public Task<Doctor?> GetByIdAsync(Guid id, CancellationToken ct) =>
         dbContext.Doctors.FirstOrDefaultAsync(x => x.Id == id, ct);
 
+    public Task<Doctor?> GetByIdentityUserIdAsync(string identityUserId, CancellationToken ct) =>
+        dbContext.Doctors.AsNoTracking().FirstOrDefaultAsync(x => x.IdentityUserId == identityUserId && x.IsActive, ct);
+
+    public Task<bool> IsIdentityUserIdInUseAsync(string identityUserId, Guid? exceptDoctorId, CancellationToken ct) =>
+        dbContext.Doctors.AnyAsync(x => x.IdentityUserId == identityUserId &&
+            (!exceptDoctorId.HasValue || x.Id != exceptDoctorId.Value), ct);
+
     public async Task AddAsync(Doctor doctor, CancellationToken ct) =>
         await dbContext.Doctors.AddAsync(doctor, ct);
 
