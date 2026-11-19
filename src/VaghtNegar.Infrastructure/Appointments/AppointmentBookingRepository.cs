@@ -40,8 +40,54 @@ public sealed class AppointmentBookingRepository(VaghtNegarDbContext db) : IAppo
             return new AppointmentBookingResult(AppointmentBookingFailure.PatientNotFound, null);
         }
 
+        return await CreateAppointmentAsync(
+            doctor, patient, startsAtUtc, endsAtUtc, patientNote, transaction, cancellationToken);
+    }
+
+    public async Task<AppointmentBookingResult> TryBookForPatientAsync(
+        Guid doctorId,
+        Guid patientId,
+        DateTimeOffset startsAtUtc,
+        DateTimeOffset endsAtUtc,
+        string? patientNote,
+        CancellationToken cancellationToken)
+    {
+        await using var transaction = await db.Database.BeginTransactionAsync(
+            IsolationLevel.Serializable, cancellationToken);
+
+        var doctor = await db.Doctors
+            .FirstOrDefaultAsync(x => x.Id == doctorId && x.IsActive, cancellationToken);
+
+        if (doctor is null)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return new AppointmentBookingResult(AppointmentBookingFailure.DoctorNotFound, null);
+        }
+
+        var patient = await db.Patients
+            .FirstOrDefaultAsync(x => x.Id == patientId && x.IsActive, cancellationToken);
+
+        if (patient is null)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return new AppointmentBookingResult(AppointmentBookingFailure.PatientNotFound, null);
+        }
+
+        return await CreateAppointmentAsync(
+            doctor, patient, startsAtUtc, endsAtUtc, patientNote, transaction, cancellationToken);
+    }
+
+    private async Task<AppointmentBookingResult> CreateAppointmentAsync(
+        Doctor doctor,
+        Patient patient,
+        DateTimeOffset startsAtUtc,
+        DateTimeOffset endsAtUtc,
+        string? patientNote,
+        Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction transaction,
+        CancellationToken cancellationToken)
+    {
         var hasOverlap = await db.Appointments.AnyAsync(x =>
-            x.DoctorId == doctorId &&
+            x.DoctorId == doctor.Id &&
             x.Status != AppointmentStatus.Cancelled &&
             x.StartsAtUtc < endsAtUtc &&
             x.EndsAtUtc > startsAtUtc,
@@ -54,7 +100,7 @@ public sealed class AppointmentBookingRepository(VaghtNegarDbContext db) : IAppo
         }
 
         var appointment = new Appointment(
-            doctor.ClinicId, doctorId, patient.Id, startsAtUtc, endsAtUtc, patientNote);
+            doctor.ClinicId, doctor.Id, patient.Id, startsAtUtc, endsAtUtc, patientNote);
 
         await db.Appointments.AddAsync(appointment, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
