@@ -157,14 +157,14 @@
                             <td>@item.MobileNumber</td>
                             <td>@item.Doctor</td>
                             <td class="time-cell">@FormatAppointmentTime(item.StartsAtUtc)</td>
-                            <td><span class="soft-status">@LocalizeStatus(item.Status)</span></td>
+                            <td><span class="soft-status">@item.Status</span></td>
                             <td class="admin-actions">
-                                @if (item.Status == "Pending")
+                                @if (item.StatusCode == "Pending")
                                 {
                                     <button class="btn btn-small btn-primary" disabled="@saving" @onclick="() => ConfirmAppointmentAsync(item)">تأیید</button>
                                     <button class="btn btn-small btn-danger-soft" disabled="@saving" @onclick="() => CancelAppointmentAsync(item)">لغو</button>
                                 }
-                                else if (item.Status == "Confirmed" && item.StartsAtUtc > DateTimeOffset.UtcNow)
+                                else if (item.StatusCode == "Confirmed" && item.StartsAtUtc > DateTimeOffset.UtcNow)
                                 {
                                     <button class="btn btn-small btn-danger-soft" disabled="@saving" @onclick="() => CancelAppointmentAsync(item)">لغو</button>
                                 }
@@ -234,7 +234,7 @@
     {
         searchingPatients = true;
         patientsSearched = false;
-        patientMatches = await ApiClient.GetPatientsAsync(patientSearch);
+        patientMatches = (await ApiClient.GetPatientsAsync(patientSearch)).Where(x => x.IsActive).ToList();
         patientsSearched = true;
         searchingPatients = false;
     }
