@@ -164,9 +164,17 @@
                                     <button class="btn btn-small btn-primary" disabled="@saving" @onclick="() => ConfirmAppointmentAsync(item)">تأیید</button>
                                     <button class="btn btn-small btn-danger-soft" disabled="@saving" @onclick="() => CancelAppointmentAsync(item)">لغو</button>
                                 }
-                                else if (item.StatusCode == "Confirmed" && item.StartsAtUtc > DateTimeOffset.UtcNow)
+                                else if (item.StatusCode == "Confirmed")
                                 {
-                                    <button class="btn btn-small btn-danger-soft" disabled="@saving" @onclick="() => CancelAppointmentAsync(item)">لغو</button>
+                                    @if (item.StartsAtUtc > DateTimeOffset.UtcNow)
+                                    {
+                                        <button class="btn btn-small btn-danger-soft" disabled="@saving" @onclick="() => CancelAppointmentAsync(item)">لغو</button>
+                                    }
+                                    else if (item.EndsAtUtc <= DateTimeOffset.UtcNow)
+                                    {
+                                        <button class="btn btn-small btn-primary" disabled="@saving" @onclick="() => CompleteAppointmentAsync(item)">ثبت انجام</button>
+                                        <button class="btn btn-small btn-outline" disabled="@saving" @onclick="() => MarkNoShowAsync(item)">عدم مراجعه</button>
+                                    }
                                 }
                             </td>
                         </tr>
@@ -359,6 +367,12 @@
 
     private async Task CancelAppointmentAsync(AppointmentListItem item) =>
         await ChangeStatusAsync(item, "cancel");
+
+    private async Task CompleteAppointmentAsync(AppointmentListItem item) =>
+        await ChangeStatusAsync(item, "complete");
+
+    private async Task MarkNoShowAsync(AppointmentListItem item) =>
+        await ChangeStatusAsync(item, "no-show");
 
     private async Task ChangeStatusAsync(AppointmentListItem item, string action)
     {
