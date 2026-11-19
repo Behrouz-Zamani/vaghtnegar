@@ -65,7 +65,7 @@ public sealed class DoctorService(IDoctorRepository repository, IClinicRepositor
         return ToDto(doctor);
     }
 
-    private static DoctorDto ToDto(Doctor x) => new(x.Id, x.ClinicId, x.FirstName, x.LastName, x.MedicalCode, x.IdentityUserId, x.IsActive, x.CreatedAtUtc, x.UpdatedAtUtc);
+    private static DoctorDto ToDto(Doctor x) => new(x.Id, x.ClinicId, x.FirstName, x.LastName, x.MedicalCode, !string.IsNullOrWhiteSpace(x.IdentityUserId), x.IsActive, x.CreatedAtUtc, x.UpdatedAtUtc);
 }
 
 public sealed class ClinicNotFoundException(Guid clinicId) : Exception($"Clinic '{clinicId}' was not found.")
