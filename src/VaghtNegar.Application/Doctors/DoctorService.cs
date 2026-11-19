@@ -11,6 +11,13 @@ public sealed class DoctorService(IDoctorRepository repository, IClinicRepositor
         return doctors.Select(ToDto).ToArray();
     }
 
+    public async Task<DoctorDto?> GetByIdentityUserIdAsync(string identityUserId, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(identityUserId)) return null;
+        var doctor = await repository.GetByIdentityUserIdAsync(identityUserId, ct);
+        return doctor is null ? null : ToDto(doctor);
+    }
+
     public async Task<DoctorDto?> GetByIdAsync(Guid id, CancellationToken ct)
     {
         var doctor = await repository.GetByIdAsync(id, ct);
@@ -46,7 +53,19 @@ public sealed class DoctorService(IDoctorRepository repository, IClinicRepositor
         return ToDto(doctor);
     }
 
-    private static DoctorDto ToDto(Doctor x) => new(x.Id, x.ClinicId, x.FirstName, x.LastName, x.MedicalCode, x.IsActive, x.CreatedAtUtc, x.UpdatedAtUtc);
+    public async Task<DoctorDto?> LinkIdentityAsync(Guid id, string? identityUserId, CancellationToken ct)
+    {
+        var doctor = await repository.GetByIdAsync(id, ct);
+        if (doctor is null) return null;
+        if (!string.IsNullOrWhiteSpace(identityUserId) &&
+            await repository.IsIdentityUserIdInUseAsync(identityUserId.Trim(), id, ct))
+            throw new DoctorIdentityAlreadyLinkedException();
+        doctor.LinkIdentity(identityUserId);
+        await repository.SaveChangesAsync(ct);
+        return ToDto(doctor);
+    }
+
+    private static DoctorDto ToDto(Doctor x) => new(x.Id, x.ClinicId, x.FirstName, x.LastName, x.MedicalCode, x.IdentityUserId, x.IsActive, x.CreatedAtUtc, x.UpdatedAtUtc);
 }
 
 public sealed class ClinicNotFoundException(Guid clinicId) : Exception($"Clinic '{clinicId}' was not found.")
@@ -58,3 +77,4 @@ public sealed class ClinicInactiveException(Guid clinicId) : Exception($"Clinic 
 {
     public Guid ClinicId { get; } = clinicId;
 }
+public sealed class DoctorIdentityAlreadyLinkedException() : Exception("این حساب کاربری قبلاً به پزشک دیگری متصل شده است.");
