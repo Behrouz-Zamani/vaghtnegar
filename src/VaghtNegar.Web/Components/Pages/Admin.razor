@@ -25,6 +25,14 @@
 {
     <div class="panel-card loading-line"><span></span> در حال دریافت اطلاعات...</div>
 }
+else if (dataLoadFailed)
+{
+    <div class="notice-card" role="alert">
+        <strong>دریافت اطلاعات مدیریت ناموفق بود.</strong>
+        <p>@dataLoadError</p>
+        <button class="btn btn-primary" @onclick="ReloadAsync">تلاش مجدد</button>
+    </div>
+}
 else
 {
     <section class="panel-card admin-section">
@@ -144,6 +152,8 @@ else
     private List<AdminClinicItem> clinics = [];
     private List<AdminDoctorItem> doctors = [];
     private bool loading = true;
+    private bool dataLoadFailed;
+    private string? dataLoadError;
     private bool saving;
     private bool clinicEditorOpen;
     private bool doctorEditorOpen;
@@ -164,13 +174,39 @@ else
     private async Task ReloadAsync()
     {
         loading = true;
-        var clinicTask = ApiClient.GetClinicsAsync();
-        var doctorTask = ApiClient.GetDoctorsAsync();
-        await Task.WhenAll(clinicTask, doctorTask);
-        clinics = await clinicTask;
-        doctors = await doctorTask;
-        identityUserIds = doctors.ToDictionary(x => x.Id, _ => "");
-        loading = false;
+        dataLoadFailed = false;
+        dataLoadError = null;
+
+        try
+        {
+            var clinicTask = ApiClient.GetClinicsResultAsync();
+            var doctorTask = ApiClient.GetDoctorsResultAsync();
+            await Task.WhenAll(clinicTask, doctorTask);
+
+            var clinicResult = await clinicTask;
+            var doctorResult = await doctorTask;
+
+            if (!clinicResult.Succeeded || !doctorResult.Succeeded)
+            {
+                dataLoadFailed = true;
+                dataLoadError = string.Join(" ", new[] { clinicResult.Error, doctorResult.Error }
+                    .Where(message => !string.IsNullOrWhiteSpace(message)));
+                return;
+            }
+
+            clinics = clinicResult.Data ?? [];
+            doctors = doctorResult.Data ?? [];
+            identityUserIds = doctors.ToDictionary(x => x.Id, _ => "");
+        }
+        catch (Exception)
+        {
+            dataLoadFailed = true;
+            dataLoadError = "خطای پیش‌بینی‌نشده هنگام دریافت اطلاعات رخ داد. دوباره تلاش کنید.";
+        }
+        finally
+        {
+            loading = false;
+        }
     }
 
     private void NewClinic()
