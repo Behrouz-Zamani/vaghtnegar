@@ -31,6 +31,8 @@ public sealed class VaghtNegarDbContext(DbContextOptions<VaghtNegarDbContext> op
             entity.Property(x => x.FirstName).HasMaxLength(100).IsRequired();
             entity.Property(x => x.LastName).HasMaxLength(100).IsRequired();
             entity.Property(x => x.MedicalCode).HasMaxLength(50);
+            entity.Property(x => x.IdentityUserId).HasMaxLength(128);
+            entity.HasIndex(x => x.IdentityUserId).IsUnique().HasFilter("[IdentityUserId] IS NOT NULL");
             entity.HasIndex(x => new { x.ClinicId, x.MedicalCode });
         });
 
