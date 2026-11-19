@@ -110,12 +110,22 @@ else
         else
         {
             <div class="table-wrap"><table>
-                <thead><tr><th>نام پزشک</th><th>کد نظام پزشکی</th><th>کلینیک</th><th>وضعیت</th><th>عملیات</th></tr></thead>
+                <thead><tr><th>نام پزشک</th><th>کد نظام پزشکی</th><th>اتصال حساب پزشک (Keycloak sub)</th><th>کلینیک</th><th>وضعیت</th><th>عملیات</th></tr></thead>
                 <tbody>
                     @foreach (var doctor in doctors)
                     {
                         <tr>
                             <td>@doctor.FirstName @doctor.LastName</td><td>@(doctor.MedicalCode ?? "—")</td>
+                            <td>
+                                <div class="doctor-link-editor">
+                                    <input class="admin-input" dir="ltr" placeholder="Keycloak sub" @bind="identityUserIds[doctor.Id]" />
+                                    <button class="btn btn-outline btn-small" disabled="@saving" @onclick="() => LinkDoctorAccountAsync(doctor)">اتصال</button>
+                                </div>
+                                @if (!string.IsNullOrWhiteSpace(doctor.IdentityUserId))
+                                {
+                                    <small class="linked-account">حساب متصل است</small>
+                                }
+                            </td>
                             <td>@(clinics.FirstOrDefault(x => x.Id == doctor.ClinicId)?.Name ?? "—")</td>
                             <td><span class="admin-status @(doctor.IsActive ? "active" : "inactive")">@(doctor.IsActive ? "فعال" : "غیرفعال")</span></td>
                             <td class="admin-actions">
@@ -147,6 +157,7 @@ else
     private string doctorLastName = "";
     private string doctorMedicalCode = "";
     private string doctorClinicId = "";
+    private Dictionary<Guid, string> identityUserIds = [];
 
     protected override async Task OnInitializedAsync() => await ReloadAsync();
 
@@ -158,6 +169,7 @@ else
         await Task.WhenAll(clinicTask, doctorTask);
         clinics = await clinicTask;
         doctors = await doctorTask;
+        identityUserIds = doctors.ToDictionary(x => x.Id, x => x.IdentityUserId ?? "");
         loading = false;
     }
 
@@ -237,6 +249,22 @@ else
         saving = false;
         if (!result.Succeeded) { ShowFeedback(result.Message, true); return; }
         await ReloadAsync(); ShowFeedback(result.Message, false);
+    }
+
+    private async Task LinkDoctorAccountAsync(AdminDoctorItem doctor)
+    {
+        var subject = identityUserIds.GetValueOrDefault(doctor.Id, "").Trim();
+        if (string.IsNullOrWhiteSpace(subject))
+        {
+            ShowFeedback("ابتدا شناسه sub کاربر پزشک را وارد کنید. برای قطع اتصال، مقدار را خالی بگذارید و دوباره اتصال را بزنید.", true);
+            return;
+        }
+        saving = true;
+        var result = await ApiClient.LinkDoctorIdentityAsync(doctor.Id, subject);
+        saving = false;
+        if (!result.Succeeded) { ShowFeedback(result.Message, true); return; }
+        await ReloadAsync();
+        ShowFeedback("حساب کاربری پزشک با موفقیت متصل شد.", false);
     }
 
     private void ShowFeedback(string message, bool isError) { feedback = message; feedbackIsError = isError; }
