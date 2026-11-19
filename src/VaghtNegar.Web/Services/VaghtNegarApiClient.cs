@@ -98,21 +98,19 @@ public sealed class VaghtNegarApiClient(IJSRuntime jsRuntime)
         Guid doctorId, Guid patientId, DateTimeOffset startsAtUtc, string? patientNote, CancellationToken ct = default) =>
         SendAsync("POST", "bff/api/v1/appointments", new { doctorId, patientId, startsAtUtc, patientNote }, ct);
 
-    public async Task<AdminMutationResult> ChangeAppointmentStatusAsync(
+    public Task<AdminMutationResult> ChangeAppointmentStatusAsync(
         Guid id, string action, CancellationToken ct = default)
     {
-        try
-        {
-            var response = await jsRuntime.InvokeAsync<BrowserApiResponse>(
-                "vaghtNegarApi.request", ct, "PATCH", $"bff/api/v1/appointments/{id}/{action}", (string?)null);
-            return response.Status is >= 200 and < 300
-                ? new AdminMutationResult(true, "وضعیت نوبت با موفقیت تغییر کرد.")
-                : new AdminMutationResult(false, ReadError(response.Body, response.Status));
-        }
-        catch (JSException)
-        {
-            return new AdminMutationResult(false, "ارتباط با سرور برقرار نشد.");
-        }
+        if (id == Guid.Empty)
+            return Task.FromResult(new AdminMutationResult(false, "شناسه نوبت معتبر نیست."));
+
+        var allowedActions = new[] { "confirm", "cancel", "complete", "no-show" };
+        if (!allowedActions.Contains(action, StringComparer.OrdinalIgnoreCase))
+            return Task.FromResult(new AdminMutationResult(false, "عملیات تغییر وضعیت معتبر نیست."));
+
+        // Send an explicit empty JSON object so the BFF forwards a PATCH body
+        // consistently across browsers and hosting environments.
+        return SendAsync("PATCH", $"bff/api/v1/appointments/{id}/{action}", new { }, ct);
     }
 
     private async Task<List<T>> TryGetCollectionAsync<T>(string path, CancellationToken ct)
