@@ -1,31 +1,405 @@
 @page "/reception"
 @attribute [Authorize(Roles = "Receptionist,ClinicAdmin,SuperAdmin")]
 @inject VaghtNegarApiClient ApiClient
+
 <PageTitle>پذیرش و نوبت‌ها | وقت‌نگار</PageTitle>
-<section class="page-heading"><span class="eyebrow">مدیریت مراجعه‌کنندگان</span><h1>پذیرش و نوبت‌ها</h1><p class="page-lead">فهرست نوبت‌ها و وضعیت مراجعات ثبت‌شده در سامانه.</p></section>
-<div class="panel-card table-panel">
-    <div class="panel-heading"><div><span class="eyebrow">فهرست نوبت‌ها</span><h2>آخرین درخواست‌ها</h2></div><button class="btn btn-outline" @onclick="ReloadAsync">به‌روزرسانی</button></div>
-    @if (loading) { <div class="loading-line"><span></span> در حال دریافت اطلاعات...</div> }
-    else if (result is { Succeeded: true, Appointments.Count: > 0 }) {
-        <div class="table-wrap"><table><thead><tr><th>پزشک</th><th>بیمار</th><th>ساعت</th><th>وضعیت</th></tr></thead><tbody>@foreach (var item in result.Appointments) { <tr><td>@item.Doctor</td><td>@item.Patient</td><td class="time-cell">@item.Time</td><td><span class="soft-status">@item.Status</span></td></tr> }</tbody></table></div>
-    } else { <div class="empty-inline">@((result?.Error) ?? "نوبتی برای نمایش وجود ندارد.")</div> }
-</div>
-<div class="notice-card"><strong>گام بعدی</strong><p>در مرحله بعد فیلتر تاریخ شمسی، جست‌وجوی بیمار، ثبت نوبت حضوری و عملیات تأیید یا لغو به این صفحه اضافه می‌شود.</p></div>
+
+<section class="page-heading">
+    <span class="eyebrow">مدیریت مراجعه‌کنندگان</span>
+    <h1>پذیرش و نوبت‌ها</h1>
+    <p class="page-lead">ثبت پرونده بیمار، رزرو نوبت و مدیریت مراجعات کلینیک.</p>
+</section>
+
+@if (!string.IsNullOrWhiteSpace(feedback))
+{
+    <div class="admin-feedback @(feedbackIsError ? "error" : "success")">@feedback</div>
+}
+
+<section class="panel-card reception-section">
+    <div class="panel-heading">
+        <div><span class="eyebrow">پرونده‌ها</span><h2>جست‌وجوی بیمار</h2></div>
+    </div>
+    <div class="reception-search-row">
+        <input class="admin-input" placeholder="نام، نام خانوادگی یا شماره موبایل بیمار" @bind="patientSearch" @bind:event="oninput" />
+        <button class="btn btn-primary" disabled="@searchingPatients" @onclick="SearchPatientsAsync">@(searchingPatients ? "در حال جست‌وجو..." : "جست‌وجو")</button>
+        <button class="btn btn-outline" @onclick="OpenNewPatient">ثبت بیمار جدید</button>
+    </div>
+
+    @if (patientMatches.Count > 0)
+    {
+        <div class="patient-results">
+            @foreach (var patient in patientMatches)
+            {
+                <button type="button" class="patient-result @(selectedPatientId == patient.Id ? "selected" : "")" @onclick="() => SelectPatient(patient)">
+                    <span><strong>@patient.FirstName @patient.LastName</strong><small>@patient.MobileNumber</small></span>
+                    <span class="patient-select-label">@(selectedPatientId == patient.Id ? "انتخاب شده" : "انتخاب بیمار")</span>
+                </button>
+            }
+        </div>
+    }
+    else if (patientsSearched)
+    {
+        <div class="empty-inline">بیماری با این مشخصات پیدا نشد. می‌توانید پرونده جدید ثبت کنید.</div>
+    }
+
+    @if (newPatientOpen)
+    {
+        <div class="admin-editor reception-editor">
+            <h3>ثبت پرونده بیمار جدید</h3>
+            <div class="admin-form-grid">
+                <label>نام<input class="admin-input" @bind="newPatientFirstName" /></label>
+                <label>نام خانوادگی<input class="admin-input" @bind="newPatientLastName" /></label>
+                <label>شماره موبایل<input class="admin-input" inputmode="tel" @bind="newPatientMobile" /></label>
+                <label>تاریخ تولد (اختیاری، میلادی)<input class="admin-input" type="date" @bind="newPatientBirthDate" /></label>
+            </div>
+            <div class="admin-form-actions">
+                <button class="btn btn-primary" disabled="@saving" @onclick="CreatePatientAsync">@(saving ? "در حال ذخیره..." : "ثبت بیمار")</button>
+                <button class="btn btn-outline" disabled="@saving" @onclick="() => newPatientOpen = false">انصراف</button>
+            </div>
+        </div>
+    }
+    @if (selectedPatient is not null)
+    {
+        <div class="selected-patient">
+            <span><small>بیمار انتخاب‌شده</small><strong>@selectedPatient.FirstName @selectedPatient.LastName</strong><small>@selectedPatient.MobileNumber</small></span>
+            <button class="btn btn-outline btn-small" @onclick="ClearSelectedPatient">تغییر بیمار</button>
+        </div>
+    }
+</section>
+
+<section class="panel-card reception-section">
+    <div class="panel-heading">
+        <div><span class="eyebrow">رزرو حضوری</span><h2>ثبت نوبت جدید</h2></div>
+    </div>
+    <div class="admin-form-grid">
+        <label>
+            پزشک
+            <select class="admin-input" @bind="selectedDoctorId">
+                <option value="">انتخاب پزشک</option>
+                @foreach (var doctor in doctors.Where(x => x.IsActive))
+                {
+                    <option value="@doctor.Id">@doctor.FirstName @doctor.LastName</option>
+                }
+            </select>
+        </label>
+        <label>
+            تاریخ نوبت (شمسی)
+            <input class="admin-input" placeholder="۱۴۰۵/۰۸/۲۸" @bind="jalaliDate" />
+        </label>
+    </div>
+    <div class="admin-form-actions">
+        <button class="btn btn-outline" disabled="@loadingSlots" @onclick="LoadSlotsAsync">@(loadingSlots ? "در حال دریافت..." : "نمایش ساعت‌های خالی")</button>
+    </div>
+    @if (availableSlots.Count > 0)
+    {
+        <div class="admin-form-grid reception-slot-grid">
+            <label>
+                ساعت‌های آزاد
+                <select class="admin-input" @bind="selectedSlotUtc">
+                    <option value="">انتخاب ساعت</option>
+                    @foreach (var slot in availableSlots)
+                    {
+                        <option value="@slot.StartsAtUtc.ToString("O")">@slot.StartTime تا @slot.EndTime</option>
+                    }
+                </select>
+            </label>
+            <label>توضیحات (اختیاری)<input class="admin-input" maxlength="1000" @bind="patientNote" placeholder="توضیحات مربوط به نوبت" /></label>
+        </div>
+    }
+    @if (availableSlots.Count == 0 && slotsLoaded)
+    {
+        <div class="empty-inline">برای این پزشک و تاریخ، ساعت خالی وجود ندارد.</div>
+    }
+    <div class="admin-form-actions">
+        <button class="btn btn-primary" disabled="@saving || selectedPatient is null || !Guid.TryParse(selectedDoctorId, out _) || !DateTimeOffset.TryParse(selectedSlotUtc, out _)" @onclick="CreateAppointmentAsync">
+            @(saving ? "در حال ثبت..." : "ثبت نوبت برای بیمار انتخاب‌شده")
+        </button>
+    </div>
+    @if (selectedPatient is null)
+    {
+        <p class="form-hint">ابتدا از بخش جست‌وجوی بیمار، یک بیمار را انتخاب کنید.</p>
+    }
+</section>
+
+<section class="panel-card reception-section">
+    <div class="panel-heading">
+        <div><span class="eyebrow">مدیریت مراجعات</span><h2>فهرست نوبت‌ها <span class="count-chip">@appointmentResult?.TotalCount</span></h2></div>
+        <button class="btn btn-outline" disabled="@loadingAppointments" @onclick="ReloadAppointmentsAsync">به‌روزرسانی</button>
+    </div>
+    <div class="reception-filter-row">
+        <label>وضعیت
+            <select class="admin-input" @bind="statusFilter">
+                <option value="">همه وضعیت‌ها</option>
+                <option value="Pending">در انتظار</option>
+                <option value="Confirmed">تأییدشده</option>
+                <option value="Cancelled">لغوشده</option>
+                <option value="Completed">انجام‌شده</option>
+                <option value="NoShow">عدم مراجعه</option>
+            </select>
+        </label>
+        <button class="btn btn-outline" @onclick="ApplyFilterAsync">اعمال فیلتر</button>
+    </div>
+
+    @if (loadingAppointments)
+    {
+        <div class="loading-line"><span></span> در حال دریافت نوبت‌ها...</div>
+    }
+    else if (appointmentResult is { Succeeded: true, Appointments.Count: > 0 })
+    {
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>بیمار</th><th>موبایل</th><th>پزشک</th><th>تاریخ و ساعت</th><th>وضعیت</th><th>عملیات</th></tr></thead>
+                <tbody>
+                    @foreach (var item in appointmentResult.Appointments)
+                    {
+                        <tr>
+                            <td>@item.Patient</td>
+                            <td>@item.MobileNumber</td>
+                            <td>@item.Doctor</td>
+                            <td class="time-cell">@FormatAppointmentTime(item.StartsAtUtc)</td>
+                            <td><span class="soft-status">@LocalizeStatus(item.Status)</span></td>
+                            <td class="admin-actions">
+                                @if (item.Status == "Pending")
+                                {
+                                    <button class="btn btn-small btn-primary" disabled="@saving" @onclick="() => ConfirmAppointmentAsync(item)">تأیید</button>
+                                    <button class="btn btn-small btn-danger-soft" disabled="@saving" @onclick="() => CancelAppointmentAsync(item)">لغو</button>
+                                }
+                                else if (item.Status == "Confirmed" && item.StartsAtUtc > DateTimeOffset.UtcNow)
+                                {
+                                    <button class="btn btn-small btn-danger-soft" disabled="@saving" @onclick="() => CancelAppointmentAsync(item)">لغو</button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        @if (appointmentResult.TotalPages > 1)
+        {
+            <div class="reception-pagination">
+                <button class="btn btn-outline btn-small" disabled="@(appointmentResult.Page <= 1)" @onclick="PreviousPageAsync">قبلی</button>
+                <span>صفحه @appointmentResult.Page از @appointmentResult.TotalPages</span>
+                <button class="btn btn-outline btn-small" disabled="@(appointmentResult.Page >= appointmentResult.TotalPages)" @onclick="NextPageAsync">بعدی</button>
+            </div>
+        }
+    }
+    else
+    {
+        <div class="empty-inline">@(appointmentResult?.Error ?? "نوبتی برای نمایش وجود ندارد.")</div>
+    }
+</section>
+
 @code {
-    private ApiCallResult? result;
-    private bool loading = true;
-    private bool loaded;
+    private List<AdminDoctorItem> doctors = [];
+    private List<PatientListItem> patientMatches = [];
+    private List<AvailableSlotItem> availableSlots = [];
+    private ApiCallResult? appointmentResult;
+    private PatientListItem? selectedPatient;
+    private Guid? selectedPatientId;
+    private string patientSearch = "";
+    private string selectedDoctorId = "";
+    private string jalaliDate = "";
+    private string selectedSlotUtc = "";
+    private string patientNote = "";
+    private string statusFilter = "";
+    private string newPatientFirstName = "";
+    private string newPatientLastName = "";
+    private string newPatientMobile = "";
+    private DateTime? newPatientBirthDate;
+    private bool loadingAppointments = true;
+    private bool loadingSlots;
+    private bool searchingPatients;
+    private bool patientsSearched;
+    private bool slotsLoaded;
+    private bool newPatientOpen;
+    private bool saving;
+    private bool initialized;
+    private bool feedbackIsError;
+    private string? feedback;
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!firstRender || loaded) return;
-        loaded = true;
-        await ReloadAsync();
-    }
-    private async Task ReloadAsync()
-    {
-        loading = true;
-        result = await ApiClient.GetAppointmentsAsync();
-        loading = false;
+        if (!firstRender || initialized) return;
+        initialized = true;
+        var doctorTask = ApiClient.GetDoctorsAsync();
+        var appointmentTask = ApiClient.GetAppointmentsAsync();
+        await Task.WhenAll(doctorTask, appointmentTask);
+        doctors = (await doctorTask).Where(x => x.IsActive).ToList();
+        appointmentResult = await appointmentTask;
+        loadingAppointments = false;
         StateHasChanged();
+    }
+
+    private async Task SearchPatientsAsync()
+    {
+        searchingPatients = true;
+        patientsSearched = false;
+        patientMatches = await ApiClient.GetPatientsAsync(patientSearch);
+        patientsSearched = true;
+        searchingPatients = false;
+    }
+
+    private void SelectPatient(PatientListItem patient)
+    {
+        selectedPatient = patient;
+        selectedPatientId = patient.Id;
+        feedback = null;
+    }
+
+    private void ClearSelectedPatient()
+    {
+        selectedPatient = null;
+        selectedPatientId = null;
+    }
+
+    private void OpenNewPatient()
+    {
+        newPatientOpen = true;
+        newPatientFirstName = "";
+        newPatientLastName = "";
+        newPatientMobile = patientSearch;
+        newPatientBirthDate = null;
+    }
+
+    private async Task CreatePatientAsync()
+    {
+        if (string.IsNullOrWhiteSpace(newPatientFirstName) ||
+            string.IsNullOrWhiteSpace(newPatientLastName) ||
+            string.IsNullOrWhiteSpace(newPatientMobile))
+        {
+            ShowFeedback("نام، نام خانوادگی و شماره موبایل بیمار الزامی است.", true);
+            return;
+        }
+
+        saving = true;
+        var result = await ApiClient.CreatePatientAsync(
+            newPatientFirstName.Trim(),
+            newPatientLastName.Trim(),
+            newPatientMobile.Trim(),
+            newPatientBirthDate.HasValue ? DateOnly.FromDateTime(newPatientBirthDate.Value) : null);
+        saving = false;
+
+        if (!result.Succeeded)
+        {
+            ShowFeedback(result.Message, true);
+            return;
+        }
+
+        newPatientOpen = false;
+        patientSearch = newPatientMobile;
+        await SearchPatientsAsync();
+        if (patientMatches.Count == 1) SelectPatient(patientMatches[0]);
+        ShowFeedback("پرونده بیمار ثبت شد.", false);
+    }
+
+    private async Task LoadSlotsAsync()
+    {
+        if (!Guid.TryParse(selectedDoctorId, out var doctorId))
+        {
+            ShowFeedback("ابتدا پزشک را انتخاب کنید.", true);
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(jalaliDate))
+        {
+            ShowFeedback("تاریخ شمسی نوبت را وارد کنید.", true);
+            return;
+        }
+
+        loadingSlots = true;
+        slotsLoaded = false;
+        selectedSlotUtc = "";
+        availableSlots = await ApiClient.GetAvailableSlotsAsync(doctorId, jalaliDate);
+        loadingSlots = false;
+        slotsLoaded = true;
+    }
+
+    private async Task CreateAppointmentAsync()
+    {
+        if (selectedPatient is null ||
+            !Guid.TryParse(selectedDoctorId, out var doctorId) ||
+            !DateTimeOffset.TryParse(selectedSlotUtc, out var startsAtUtc))
+        {
+            ShowFeedback("بیمار، پزشک و ساعت نوبت را انتخاب کنید.", true);
+            return;
+        }
+
+        saving = true;
+        var result = await ApiClient.CreateReceptionAppointmentAsync(
+            doctorId, selectedPatient.Id, startsAtUtc.ToUniversalTime(), string.IsNullOrWhiteSpace(patientNote) ? null : patientNote.Trim());
+        saving = false;
+
+        if (!result.Succeeded)
+        {
+            ShowFeedback(result.Message, true);
+            await LoadSlotsAsync();
+            return;
+        }
+
+        patientNote = "";
+        selectedSlotUtc = "";
+        await LoadSlotsAsync();
+        await ReloadAppointmentsAsync();
+        ShowFeedback("نوبت با موفقیت ثبت شد.", false);
+    }
+
+    private async Task ReloadAppointmentsAsync(int page = 1)
+    {
+        loadingAppointments = true;
+        appointmentResult = await ApiClient.GetAppointmentsAsync(
+            page, status: string.IsNullOrWhiteSpace(statusFilter) ? null : statusFilter);
+        loadingAppointments = false;
+    }
+
+    private Task ApplyFilterAsync() => ReloadAppointmentsAsync();
+    private Task PreviousPageAsync() => ReloadAppointmentsAsync(Math.Max(1, (appointmentResult?.Page ?? 1) - 1));
+    private Task NextPageAsync() => ReloadAppointmentsAsync(Math.Min(appointmentResult?.TotalPages ?? 1, (appointmentResult?.Page ?? 1) + 1));
+
+    private async Task ConfirmAppointmentAsync(AppointmentListItem item) =>
+        await ChangeStatusAsync(item, "confirm");
+
+    private async Task CancelAppointmentAsync(AppointmentListItem item) =>
+        await ChangeStatusAsync(item, "cancel");
+
+    private async Task ChangeStatusAsync(AppointmentListItem item, string action)
+    {
+        saving = true;
+        var result = await ApiClient.ChangeAppointmentStatusAsync(item.Id, action);
+        saving = false;
+        if (!result.Succeeded)
+        {
+            ShowFeedback(result.Message, true);
+            return;
+        }
+        await ReloadAppointmentsAsync(appointmentResult?.Page ?? 1);
+        ShowFeedback(result.Message, false);
+    }
+
+    private void ShowFeedback(string message, bool isError)
+    {
+        feedback = message;
+        feedbackIsError = isError;
+    }
+
+    private static string LocalizeStatus(string status) => status switch
+    {
+        "Pending" => "در انتظار",
+        "Confirmed" => "تأییدشده",
+        "Cancelled" => "لغوشده",
+        "Completed" => "انجام‌شده",
+        "NoShow" => "عدم مراجعه",
+        _ => status
+    };
+
+    private static string FormatAppointmentTime(DateTimeOffset utc)
+    {
+        if (utc == DateTimeOffset.MinValue) return "—";
+        TimeZoneInfo zone;
+        try { zone = TimeZoneInfo.FindSystemTimeZoneById("Asia/Tehran"); }
+        catch (TimeZoneNotFoundException) { zone = TimeZoneInfo.FindSystemTimeZoneById("Iran Standard Time"); }
+        var local = TimeZoneInfo.ConvertTime(utc, zone);
+        var calendar = new System.Globalization.PersianCalendar();
+        var date = local.DateTime;
+        var jalali = $"{calendar.GetYear(date):0000}/{calendar.GetMonth(date):00}/{calendar.GetDayOfMonth(date):00}";
+        return $"{jalali} - {local:HH:mm}";
     }
 }
