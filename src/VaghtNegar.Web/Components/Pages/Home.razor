@@ -1,49 +1,112 @@
 @page "/"
-@attribute [Authorize]
-@inject VaghtNegarApiClient ApiClient
-<PageTitle>داشبورد | وقت‌نگار</PageTitle>
-<section class="welcome-row">
-    <div><span class="eyebrow">داشبورد مدیریتی</span><h1>سلام، خوش آمدید <span class="welcome-wave">✦</span></h1><p class="page-lead">از اینجا می‌توانید بخش‌های مختلف سامانه وقت‌نگار را مدیریت کنید.</p></div>
-    <div class="welcome-date"><span class="date-icon">▦</span><span><small>امروز</small><strong>@PersianDate.Today</strong></span></div>
-</section>
-<AuthorizeView Roles="Receptionist,ClinicAdmin,SuperAdmin">
-    <div class="stats-grid">
-        <article class="stat-card"><div class="stat-icon teal">✚</div><div><span>کلینیک‌های ثبت‌شده</span><strong>@(summary?.ClinicCount.ToString("N0") ?? "—")</strong><small>اطلاعات دریافتی از API</small></div></article>
-        <article class="stat-card"><div class="stat-icon blue">⚕</div><div><span>پزشکان</span><strong>@(summary?.DoctorCount.ToString("N0") ?? "—")</strong><small>پزشکان قابل مشاهده</small></div></article>
-        <article class="stat-card"><div class="stat-icon violet">▤</div><div><span>وضعیت رابط</span><strong class="status-online">فعال</strong><small>رابط کاربری آماده است</small></div></article>
-    </div>
-</AuthorizeView>
-<section class="content-grid">
-    <div class="panel-card"><div class="panel-heading"><div><span class="eyebrow">دسترسی سریع</span><h2>بخش‌های سامانه</h2></div><span class="heading-symbol">✧</span></div>
-        <div class="quick-links">
-            <AuthorizeView Roles="Patient"><a class="quick-link" href="/patient"><span class="quick-icon pink">♡</span><span><strong>پنل بیمار</strong><small>نوبت‌ها و اطلاعات شخصی</small></span><b>←</b></a></AuthorizeView>
-            <AuthorizeView Roles="Doctor"><a class="quick-link" href="/doctor"><span class="quick-icon blue">⚕</span><span><strong>پنل پزشک</strong><small>برنامه کاری و مراجعات</small></span><b>←</b></a></AuthorizeView>
-            <AuthorizeView Roles="Receptionist,ClinicAdmin,SuperAdmin"><a class="quick-link" href="/reception"><span class="quick-icon teal">▤</span><span><strong>پذیرش و نوبت‌ها</strong><small>مدیریت مراجعه‌کنندگان</small></span><b>←</b></a></AuthorizeView>
-            <AuthorizeView Roles="ClinicAdmin,SuperAdmin"><a class="quick-link" href="/admin"><span class="quick-icon violet">⚙</span><span><strong>مدیریت کلینیک</strong><small>پزشکان و مراکز درمانی</small></span><b>←</b></a></AuthorizeView>
+@layout LandingLayout
+@using Microsoft.AspNetCore.Components
+@inject NavigationManager Navigation
+
+<PageTitle>وقت‌نگار | نوبت‌دهی هوشمند سلامت</PageTitle>
+<main class="landing-page" dir="rtl">
+    <header class="landing-header">
+        <a class="landing-brand" href="/" aria-label="وقت‌نگار">
+            <span class="landing-brand-mark"><span></span><span></span><span></span></span>
+            <span><strong>وقت‌نگار</strong><small>نوبت‌دهی هوشمند سلامت</small></span>
+        </a>
+        <button class="landing-menu-toggle" @onclick="ToggleMenu" aria-label="نمایش منو">☰</button>
+        <nav class="landing-nav @(menuOpen ? "is-open" : "")">
+            <a href="#services" @onclick="CloseMenu">خدمات</a>
+            <a href="#specialties" @onclick="CloseMenu">تخصص‌ها</a>
+            <a href="#clinics" @onclick="CloseMenu">برای کلینیک‌ها</a>
+            <a href="#how-it-works" @onclick="CloseMenu">راهنمای نوبت‌گیری</a>
+        </nav>
+        <div class="landing-header-actions">
+            <a class="landing-login" href="/account/login" data-enhance-nav="false">ورود</a>
+            <a class="landing-header-cta" href="/account/login?returnUrl=%2Fpatient" data-enhance-nav="false">دریافت نوبت <span>↗</span></a>
         </div>
-    </div>
-    <div class="panel-card highlight-panel"><div class="highlight-orb orb-one"></div><div class="highlight-orb orb-two"></div><span class="eyebrow">VaghtNegar Care</span><h2>تجربه‌ای ساده‌تر برای مراقبت بهتر</h2><p>مدیریت یکپارچه نوبت‌ها، پزشکان و خدمات کلینیک؛ در یک فضای امن و فارسی.</p><div class="highlight-footer"><span>طراحی‌شده برای مراکز درمانی</span><span class="plus-mark">＋</span></div></div>
-</section>
-<AuthorizeView Roles="Receptionist,ClinicAdmin,SuperAdmin">
-    <section class="panel-card table-panel"><div class="panel-heading"><div><span class="eyebrow">عملیات روزانه</span><h2>آخرین نوبت‌ها</h2></div><a href="/reception" class="text-link">مشاهده همه ←</a></div>
-        @if (appointmentsLoading) { <div class="loading-line"><span></span> در حال دریافت اطلاعات نوبت‌ها...</div> }
-        else if (appointmentResult is { Succeeded: true, Appointments.Count: > 0 })
-        { <div class="table-wrap"><table><thead><tr><th>پزشک</th><th>بیمار</th><th>ساعت</th><th>وضعیت</th></tr></thead><tbody>@foreach (var item in appointmentResult.Appointments) { <tr><td>@item.Doctor</td><td>@item.Patient</td><td class="time-cell">@item.Time</td><td><span class="soft-status">@item.Status</span></td></tr> }</tbody></table></div> }
-        else { <div class="empty-inline">@(appointmentResult?.Error ?? "هنوز نوبتی برای نمایش وجود ندارد.")</div> }
+    </header>
+
+    <section class="landing-hero">
+        <div class="landing-hero-copy">
+            <div class="landing-kicker"><span class="landing-kicker-dot"></span> مراقبت از سلامتی، ساده‌تر از همیشه</div>
+            <h1>برای سلامتی‌ات<br /><em>وقت ارزشمند</em> پیدا کن.</h1>
+            <p class="landing-hero-lead">وقت‌نگار راهی ساده و مطمئن برای مدیریت نوبت‌های پزشکی است؛ از انتخاب زمان مراجعه تا پیگیری نوبت‌ها، همه‌چیز در یک تجربه یکپارچه.</p>
+            <div class="landing-hero-actions">
+                <a class="landing-primary-btn" href="/account/login?returnUrl=%2Fpatient" data-enhance-nav="false">شروع نوبت‌گیری <span>←</span></a>
+                <a class="landing-text-btn" href="#how-it-works">چطور کار می‌کند؟ <span>⌄</span></a>
+            </div>
+            <div class="landing-trust-row">
+                <div class="landing-avatar-stack"><span>م</span><span>س</span><span>ع</span><b>+</b></div>
+                <div><strong>تجربه‌ای آرام و شفاف</strong><small>برای بیمار و کادر درمان</small></div>
+            </div>
+        </div>
+        <div class="landing-hero-visual">
+            <div class="landing-hero-glow"></div>
+            <div class="landing-hero-photo">
+                <img src="https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=1000&q=88" alt="پزشک در محیط درمانی" />
+            </div>
+            <div class="landing-float-card landing-float-top"><span class="landing-float-icon">✚</span><span><small>مراقبت هوشمند</small><strong>همراه مسیر سلامت شما</strong></span></div>
+            <div class="landing-float-card landing-float-bottom"><span class="landing-check-icon">✓</span><span><small>مدیریت نوبت</small><strong>ساده، دقیق و منظم</strong></span></div>
+            <div class="landing-hero-orbit orbit-a"></div><div class="landing-hero-orbit orbit-b"></div>
+            <span class="landing-hero-spark spark-a">✳</span><span class="landing-hero-spark spark-b">✦</span>
+        </div>
+        <div class="landing-hero-bottom">
+            <div><span class="hero-bottom-icon">⌕</span><span><strong>جستجوی آسان</strong><small>دسترسی سریع به خدمات</small></span></div>
+            <div><span class="hero-bottom-icon">▦</span><span><strong>برنامه‌ریزی منظم</strong><small>مدیریت زمان مراجعه</small></span></div>
+            <div><span class="hero-bottom-icon">♧</span><span><strong>تجربه یکپارچه</strong><small>برای بیمار و مرکز درمانی</small></span></div>
+        </div>
     </section>
-</AuthorizeView>
+
+    <section class="landing-section landing-specialties" id="specialties">
+        <div class="landing-section-heading"><div><span class="landing-eyebrow">خدمات سلامت</span><h2>از کجا شروع کنیم؟</h2><p>مسیر مناسب خود را برای دریافت خدمات درمانی انتخاب کنید.</p></div><a href="/account/login?returnUrl=%2Fpatient" data-enhance-nav="false" class="landing-view-all">مشاهده خدمات <span>←</span></a></div>
+        <div class="landing-specialty-grid">
+            <a href="/account/login?returnUrl=%2Fpatient" data-enhance-nav="false" class="landing-specialty-card"><span class="specialty-symbol specialty-blue">✚</span><strong>پزشک و متخصص</strong><small>دسترسی به خدمات پزشکی</small><b>↙</b></a>
+            <a href="/account/login?returnUrl=%2Fpatient" data-enhance-nav="false" class="landing-specialty-card"><span class="specialty-symbol specialty-violet">♡</span><strong>مراقبت و پیگیری</strong><small>نوبت‌ها و سوابق مراجعه</small><b>↙</b></a>
+            <a href="#clinics" class="landing-specialty-card"><span class="specialty-symbol specialty-cyan">⌂</span><strong>مراکز درمانی</strong><small>مدیریت نوبت در کلینیک</small><b>↙</b></a>
+            <a href="#services" class="landing-specialty-card"><span class="specialty-symbol specialty-orange">▦</span><strong>مدیریت نوبت‌ها</strong><small>زمان‌بندی دقیق و منظم</small><b>↙</b></a>
+        </div>
+    </section>
+
+    <section class="landing-how" id="how-it-works">
+        <div class="landing-how-copy"><span class="landing-eyebrow">شروعی بدون پیچیدگی</span><h2>نوبت گرفتن،<br /><em>در چند قدم ساده</em></h2><p>وقت‌نگار کمک می‌کند بدون تماس‌های مکرر و سردرگمی، مسیر دریافت و پیگیری نوبت را شفاف‌تر طی کنید.</p><a class="landing-primary-btn" href="/account/login?returnUrl=%2Fpatient" data-enhance-nav="false">ورود به وقت‌نگار <span>←</span></a></div>
+        <div class="landing-steps">
+            <article><span class="step-number">۰۱</span><div class="step-icon">⌕</div><div><h3>ورود به حساب کاربری</h3><p>با حساب امن خود وارد فضای اختصاصی شوید.</p></div></article>
+            <article><span class="step-number">۰۲</span><div class="step-icon">♧</div><div><h3>انتخاب پزشک و زمان</h3><p>اطلاعات و زمان‌های قابل رزرو را بررسی کنید.</p></div></article>
+            <article><span class="step-number">۰۳</span><div class="step-icon">✓</div><div><h3>ثبت و پیگیری نوبت</h3><p>نوبت خود را ثبت کنید و در پنل بیمار پیگیری کنید.</p></div></article>
+        </div>
+    </section>
+
+    <section class="landing-platform" id="services">
+        <div class="platform-copy"><span class="landing-eyebrow">برای تیم‌های درمانی</span><h2>مدیریت هوشمندتر،<br /><em>تمرکز بیشتر بر مراقبت</em></h2><p>وقت‌نگار ابزارهای یکپارچه‌ای برای مدیریت برنامه کاری پزشکان، پذیرش و نوبت‌های مراجعه‌کنندگان فراهم می‌کند.</p>
+            <ul><li><span>✓</span> مدیریت برنامه کاری و ساعت‌های قابل رزرو</li><li><span>✓</span> مدیریت نوبت‌ها و مراجعه‌کنندگان</li><li><span>✓</span> دسترسی تفکیک‌شده برای نقش‌های مختلف</li><li><span>✓</span> تجربه فارسی و ساده برای استفاده روزمره</li></ul>
+            <a class="landing-primary-btn" href="/account/login?returnUrl=%2Fadmin" data-enhance-nav="false">ورود به فضای مدیریت <span>←</span></a>
+        </div>
+        <div class="platform-preview">
+            <div class="preview-window">
+                <div class="preview-sidebar"><div class="preview-logo">وقت‌نگار<span>✚</span></div><i></i><i></i><i></i><i></i><i></i></div>
+                <div class="preview-content"><div class="preview-top"><b>نمای کلی برنامه</b><span>هفته جاری　⌄</span></div><div class="preview-metrics"><span><small>نوبت‌های امروز</small><b>۲۴</b></span><span><small>پزشکان فعال</small><b>۰۸</b></span><span><small>زمان‌بندی</small><b>منظم</b></span></div><div class="preview-calendar"><div class="preview-days"><span>شنبه</span><span>یکشنبه</span><span>دوشنبه</span><span>سه‌شنبه</span></div><div class="preview-grid"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="preview-event event-one">ویزیت</div><div class="preview-event event-two">مشاوره</div><div class="preview-event event-three">پیگیری</div></div></div>
+            </div>
+            <div class="preview-caption"><span>✦</span><div><strong>یک نمای روشن از کارهای روزانه</strong><small>پیش‌نمایش مفهومی محیط مدیریت وقت‌نگار</small></div></div>
+        </div>
+    </section>
+
+    <section class="landing-clinics" id="clinics">
+        <div class="clinic-image"><img src="https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?auto=format&fit=crop&w=1000&q=85" alt="فضای مدرن مرکز درمانی" /></div>
+        <div class="clinic-copy"><span class="landing-eyebrow">همراه مراکز درمانی</span><h2>کلینیک شما،<br /><em>منظم‌تر از همیشه</em></h2><p>با وقت‌نگار، برنامه کاری پزشکان و روند پذیرش را در یک فضای متمرکز مدیریت کنید و تجربه مراجعه‌کنندگان را بهبود دهید.</p><a class="landing-outline-btn" href="/account/login?returnUrl=%2Fadmin" data-enhance-nav="false">آشنایی با فضای مدیریت <span>←</span></a></div>
+    </section>
+
+    <section class="landing-final-cta">
+        <div class="cta-decoration">✳</div><div><span>وقت ارزشمند شما، مراقبت ارزشمندتر</span><h2>از همین امروز، هوشمندتر برنامه‌ریزی کنید.</h2><p>به تجربه ساده‌تر مدیریت نوبت و خدمات سلامت خوش آمدید.</p></div><a href="/account/login?returnUrl=%2Fpatient" data-enhance-nav="false">شروع با وقت‌نگار <span>←</span></a>
+    </section>
+
+    <footer class="landing-footer">
+        <div class="footer-main"><div class="footer-brand"><a class="landing-brand" href="/"><span class="landing-brand-mark"><span></span><span></span><span></span></span><span><strong>وقت‌نگار</strong><small>نوبت‌دهی هوشمند سلامت</small></span></a><p>زمان را بهتر مدیریت کنید؛<br />برای مراقبت بهتر، با آرامش بیشتر.</p></div>
+            <div><strong>دسترسی سریع</strong><a href="#services">خدمات وقت‌نگار</a><a href="#specialties">خدمات سلامت</a><a href="#how-it-works">راهنمای نوبت‌گیری</a></div>
+            <div><strong>ویژه مراکز درمانی</strong><a href="#clinics">همکاری با وقت‌نگار</a><a href="/account/login?returnUrl=%2Fadmin" data-enhance-nav="false">ورود مدیر کلینیک</a><a href="/account/login" data-enhance-nav="false">ورود کاربران</a></div>
+            <div class="footer-contact"><strong>همراه شما هستیم</strong><span>برای راهنمایی و پشتیبانی</span><a href="mailto:support@vaghtnegar.local">ارتباط با پشتیبانی</a></div>
+        </div><div class="footer-bottom"><span>© @DateTime.Now.Year وقت‌نگار. تمامی حقوق محفوظ است.</span><span>ساخته‌شده برای تجربه بهتر سلامت <b>✦</b></span></div>
+    </footer>
+</main>
+
 @code {
-    private ApiDashboardSummary? summary;
-    private ApiCallResult? appointmentResult;
-    private bool appointmentsLoading = true;
-    private bool loaded;
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (!firstRender || loaded) return;
-        loaded = true;
-        summary = await ApiClient.GetDashboardSummaryAsync();
-        appointmentResult = await ApiClient.GetAppointmentsAsync();
-        appointmentsLoading = false;
-        StateHasChanged();
-    }
+    private bool menuOpen;
+    private void ToggleMenu() => menuOpen = !menuOpen;
+    private void CloseMenu() => menuOpen = false;
 }
