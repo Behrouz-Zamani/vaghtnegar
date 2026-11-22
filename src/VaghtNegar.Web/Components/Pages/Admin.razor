@@ -169,7 +169,14 @@ else
     private string doctorClinicId = "";
     private Dictionary<Guid, string> identityUserIds = [];
 
-    protected override async Task OnInitializedAsync() => await ReloadAsync();
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+
+        await ReloadAsync();
+        StateHasChanged();
+    }
 
     private async Task ReloadAsync()
     {
