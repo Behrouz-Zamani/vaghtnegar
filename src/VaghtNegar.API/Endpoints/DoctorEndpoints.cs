@@ -45,7 +45,7 @@ public static class DoctorEndpoints
 
         group.MapPut("/{id:guid}", async (Guid id, UpdateDoctorRequest request, DoctorService service, CancellationToken ct) =>
         {
-            var errors = Validate(request.FirstName, request.LastName, request.MedicalCode);
+            var errors = Validate(request.FirstName, request.LastName, request.MedicalCode, request.VisitFeeToman);
             if (errors is not null) return Results.ValidationProblem(errors);
             var doctor = await service.UpdateAsync(id, request.FirstName, request.LastName, request.MedicalCode, request.VisitFeeToman, ct);
             return doctor is null ? Results.NotFound() : Results.Ok(doctor);
