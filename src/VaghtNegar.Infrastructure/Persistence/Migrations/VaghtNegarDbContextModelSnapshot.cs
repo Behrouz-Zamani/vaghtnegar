@@ -95,8 +95,12 @@ partial class VaghtNegarDbContextModelSnapshot : ModelSnapshot
             entity.Property<string>("MobileNumber").IsRequired().HasMaxLength(20).HasColumnType("nvarchar(20)");
             entity.Property<DateOnly?>("BirthDate").HasColumnType("date");
             entity.Property<DateTimeOffset>("CreatedAtUtc").HasColumnType("datetimeoffset");
+            entity.Property<string>("IdentityUserId").HasMaxLength(128).HasColumnType("nvarchar(128)");
+            entity.Property<bool>("IsActive").HasColumnType("bit");
+            entity.Property<DateTimeOffset?>("UpdatedAtUtc").HasColumnType("datetimeoffset");
             entity.HasKey("Id");
-            entity.HasIndex("MobileNumber");
+            entity.HasIndex("IdentityUserId").IsUnique().HasFilter("[IdentityUserId] IS NOT NULL");
+            entity.HasIndex("MobileNumber").IsUnique();
             entity.ToTable("Patients");
         });
     }
