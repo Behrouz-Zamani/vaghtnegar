@@ -38,11 +38,11 @@ public sealed class VaghtNegarApiClient(IJSRuntime jsRuntime)
     public Task<AdminMutationResult> SetClinicActiveAsync(Guid id, bool isActive, CancellationToken ct = default) =>
         SendAsync("PATCH", $"bff/api/v1/clinics/{id}/active", new { isActive }, ct);
 
-    public Task<AdminMutationResult> CreateDoctorAsync(Guid clinicId, string firstName, string lastName, string? medicalCode, CancellationToken ct = default) =>
-        SendAsync("POST", "bff/api/v1/doctors/", new { clinicId, firstName, lastName, medicalCode }, ct);
+    public Task<AdminMutationResult> CreateDoctorAsync(Guid clinicId, string firstName, string lastName, string? medicalCode, long visitFeeToman, CancellationToken ct = default) =>
+        SendAsync("POST", "bff/api/v1/doctors/", new { clinicId, firstName, lastName, medicalCode, visitFeeToman }, ct);
 
-    public Task<AdminMutationResult> UpdateDoctorAsync(Guid id, string firstName, string lastName, string? medicalCode, CancellationToken ct = default) =>
-        SendAsync("PUT", $"bff/api/v1/doctors/{id}", new { firstName, lastName, medicalCode }, ct);
+    public Task<AdminMutationResult> UpdateDoctorAsync(Guid id, string firstName, string lastName, string? medicalCode, long visitFeeToman, CancellationToken ct = default) =>
+        SendAsync("PUT", $"bff/api/v1/doctors/{id}", new { firstName, lastName, medicalCode, visitFeeToman }, ct);
 
     public Task<AdminMutationResult> SetDoctorActiveAsync(Guid id, bool isActive, CancellationToken ct = default) =>
         SendAsync("PATCH", $"bff/api/v1/doctors/{id}/active", new { isActive }, ct);
@@ -377,7 +377,7 @@ public sealed record ApiCallResult(bool Succeeded, string? Error, IReadOnlyList<
 public sealed record AppointmentListItem(Guid Id, Guid DoctorId, Guid PatientId, string Doctor, string Patient, string MobileNumber, DateTimeOffset StartsAtUtc, DateTimeOffset EndsAtUtc, string StatusCode, string Status, string Time);
 public sealed record AdminMutationResult(bool Succeeded, string Message);
 public sealed record AdminClinicItem(Guid Id, string Name, string Slug, bool IsActive);
-public sealed record AdminDoctorItem(Guid Id, Guid ClinicId, string FirstName, string LastName, string? MedicalCode, bool HasLinkedIdentity, bool IsActive);
+public sealed record AdminDoctorItem(Guid Id, Guid ClinicId, string FirstName, string LastName, string? MedicalCode, long VisitFeeToman, bool HasLinkedIdentity, bool IsActive);
 public sealed record PatientListItem(Guid Id, string FirstName, string LastName, string MobileNumber, DateOnly? BirthDate, bool IsActive);
 public sealed record AvailableSlotItem(string JalaliDate, string DayName, string StartTime, string EndTime, DateTimeOffset StartsAtUtc, DateTimeOffset EndsAtUtc);
 
