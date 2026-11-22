@@ -24,22 +24,22 @@ public sealed class DoctorService(IDoctorRepository repository, IClinicRepositor
         return doctor is null ? null : ToDto(doctor);
     }
 
-    public async Task<DoctorDto> CreateAsync(Guid clinicId, string firstName, string lastName, string? medicalCode, CancellationToken ct)
+    public async Task<DoctorDto> CreateAsync(Guid clinicId, string firstName, string lastName, string? medicalCode, long visitFeeToman, CancellationToken ct)
     {
         var clinic = await clinicRepository.GetByIdAsync(clinicId, ct);
         if (clinic is null) throw new ClinicNotFoundException(clinicId);
         if (!clinic.IsActive) throw new ClinicInactiveException(clinicId);
-        var doctor = new Doctor(clinicId, firstName, lastName, medicalCode);
+        var doctor = new Doctor(clinicId, firstName, lastName, medicalCode, visitFeeToman);
         await repository.AddAsync(doctor, ct);
         await repository.SaveChangesAsync(ct);
         return ToDto(doctor);
     }
 
-    public async Task<DoctorDto?> UpdateAsync(Guid id, string firstName, string lastName, string? medicalCode, CancellationToken ct)
+    public async Task<DoctorDto?> UpdateAsync(Guid id, string firstName, string lastName, string? medicalCode, long visitFeeToman, CancellationToken ct)
     {
         var doctor = await repository.GetByIdAsync(id, ct);
         if (doctor is null) return null;
-        doctor.UpdateDetails(firstName, lastName, medicalCode);
+        doctor.UpdateDetails(firstName, lastName, medicalCode, visitFeeToman);
         await repository.SaveChangesAsync(ct);
         return ToDto(doctor);
     }
@@ -65,7 +65,7 @@ public sealed class DoctorService(IDoctorRepository repository, IClinicRepositor
         return ToDto(doctor);
     }
 
-    private static DoctorDto ToDto(Doctor x) => new(x.Id, x.ClinicId, x.FirstName, x.LastName, x.MedicalCode, !string.IsNullOrWhiteSpace(x.IdentityUserId), x.IsActive, x.CreatedAtUtc, x.UpdatedAtUtc);
+    private static DoctorDto ToDto(Doctor x) => new(x.Id, x.ClinicId, x.FirstName, x.LastName, x.MedicalCode, x.VisitFeeToman, !string.IsNullOrWhiteSpace(x.IdentityUserId), x.IsActive, x.CreatedAtUtc, x.UpdatedAtUtc);
 }
 
 public sealed class ClinicNotFoundException(Guid clinicId) : Exception($"Clinic '{clinicId}' was not found.")
