@@ -47,7 +47,7 @@ else
             <div><span class="eyebrow">تنظیمات نوبت‌دهی</span><h2>برنامه کاری هفتگی</h2></div>
             <span class="count-chip">@scheduleDays.Values.Count(x => x.IsActive) روز فعال</span>
         </div>
-        <p class="doctor-help">برای هر روز می‌توانید حداکثر چهار بازه کاری (مثلاً صبح و عصر) تعریف کنید. بازه‌های یک روز نباید با هم تداخل داشته باشند.</p>
+        <p class="doctor-help">این برنامه به‌صورت هفتگی تکرار می‌شود و به یک تاریخ خاص محدود نیست. تاریخ شمسیِ نمایش‌داده‌شده کنار هر روز، نوبت بعدی آن روز در تقویم است. برای هر روز می‌توانید حداکثر چهار بازه کاری (مثلاً صبح و عصر) تعریف کنید. بازه‌های یک روز نباید با هم تداخل داشته باشند.</p>
 
         <div class="doctor-week-grid">
             @foreach (var day in WeekDays)
@@ -58,6 +58,7 @@ else
                         <label>
                             <input type="checkbox" @bind="item.IsActive" />
                             <strong>@day.Name</strong>
+                            <small class="doctor-day-date">نوبت بعدی: @FormatNextOccurrence(day.Day)</small>
                         </label>
                     </div>
 
@@ -213,6 +214,9 @@ else
 
         if (doctor is not null)
         {
+            if (string.IsNullOrWhiteSpace(jalaliDate))
+                jalaliDate = TodayJalali();
+
             var hoursResult = await ApiClient.GetMyWorkingHoursResultAsync();
             if (!hoursResult.Succeeded || hoursResult.Data is null)
             {
@@ -377,6 +381,28 @@ else
         }
         loadingSlots = false;
         slotsLoaded = true;
+    }
+
+    private static string FormatNextOccurrence(int targetDayOfWeek)
+    {
+        var tehranNow = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, GetTehranZone()).Date;
+        var daysUntil = (targetDayOfWeek - (int)tehranNow.DayOfWeek + 7) % 7;
+        var nextDate = tehranNow.AddDays(daysUntil);
+        var calendar = new System.Globalization.PersianCalendar();
+        return $"{calendar.GetYear(nextDate):0000}/{calendar.GetMonth(nextDate):00}/{calendar.GetDayOfMonth(nextDate):00}";
+    }
+
+    private static string TodayJalali()
+    {
+        var tehranNow = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, GetTehranZone()).Date;
+        var calendar = new System.Globalization.PersianCalendar();
+        return $"{calendar.GetYear(tehranNow):0000}/{calendar.GetMonth(tehranNow):00}/{calendar.GetDayOfMonth(tehranNow):00}";
+    }
+
+    private static TimeZoneInfo GetTehranZone()
+    {
+        try { return TimeZoneInfo.FindSystemTimeZoneById("Asia/Tehran"); }
+        catch (TimeZoneNotFoundException) { return TimeZoneInfo.FindSystemTimeZoneById("Iran Standard Time"); }
     }
 
     private void ShowFeedback(string message, bool isError)
