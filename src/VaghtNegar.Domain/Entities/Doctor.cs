@@ -7,6 +7,7 @@ public sealed class Doctor
     public string FirstName { get; private set; } = string.Empty;
     public string LastName { get; private set; } = string.Empty;
     public string? MedicalCode { get; private set; }
+    public long VisitFeeToman { get; private set; }
     public string? IdentityUserId { get; private set; }
     public bool IsActive { get; private set; } = true;
     public DateTimeOffset CreatedAtUtc { get; private set; } = DateTimeOffset.UtcNow;
@@ -14,17 +15,25 @@ public sealed class Doctor
 
     private Doctor() { }
 
-    public Doctor(Guid clinicId, string firstName, string lastName, string? medicalCode = null)
+    public Doctor(Guid clinicId, string firstName, string lastName, string? medicalCode, long visitFeeToman)
     {
         if (clinicId == Guid.Empty) throw new ArgumentException("Clinic is required.", nameof(clinicId));
         ClinicId = clinicId;
         SetDetails(firstName, lastName, medicalCode);
+        SetVisitFee(visitFeeToman);
     }
 
-    public void UpdateDetails(string firstName, string lastName, string? medicalCode)
+    public void UpdateDetails(string firstName, string lastName, string? medicalCode, long visitFeeToman)
     {
         SetDetails(firstName, lastName, medicalCode);
+        SetVisitFee(visitFeeToman);
         UpdatedAtUtc = DateTimeOffset.UtcNow;
+    }
+
+    private void SetVisitFee(long visitFeeToman)
+    {
+        if (visitFeeToman < 0) throw new ArgumentOutOfRangeException(nameof(visitFeeToman), "Visit fee cannot be negative.");
+        VisitFeeToman = visitFeeToman;
     }
 
     public void LinkIdentity(string? identityUserId)
