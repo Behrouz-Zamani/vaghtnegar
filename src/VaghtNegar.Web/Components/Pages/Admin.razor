@@ -92,6 +92,7 @@ else
                     <label>نام<input class="admin-input" @bind="doctorFirstName" maxlength="100" /></label>
                     <label>نام خانوادگی<input class="admin-input" @bind="doctorLastName" maxlength="100" /></label>
                     <label>کد نظام پزشکی<input class="admin-input" @bind="doctorMedicalCode" maxlength="50" /></label>
+                    <label>حق ویزیت (تومان)<input class="admin-input" type="number" min="0" step="1000" @bind="doctorVisitFeeToman" /></label>
                     @if (!editingDoctorId.HasValue)
                     {
                         <label>کلینیک
@@ -118,12 +119,12 @@ else
         else
         {
             <div class="table-wrap"><table>
-                <thead><tr><th>نام پزشک</th><th>کد نظام پزشکی</th><th>اتصال حساب پزشک (Keycloak sub)</th><th>کلینیک</th><th>وضعیت</th><th>عملیات</th></tr></thead>
+                <thead><tr><th>نام پزشک</th><th>کد نظام پزشکی</th><th>حق ویزیت</th><th>اتصال حساب پزشک (Keycloak sub)</th><th>کلینیک</th><th>وضعیت</th><th>عملیات</th></tr></thead>
                 <tbody>
                     @foreach (var doctor in doctors)
                     {
                         <tr>
-                            <td>@doctor.FirstName @doctor.LastName</td><td>@(doctor.MedicalCode ?? "—")</td>
+                            <td>@doctor.FirstName @doctor.LastName</td><td>@(doctor.MedicalCode ?? "—")</td><td>@doctor.VisitFeeToman.ToString("N0") تومان</td>
                             <td>
                                 <div class="doctor-link-editor">
                                     <input class="admin-input" dir="ltr" placeholder="Keycloak sub" @bind="identityUserIds[doctor.Id]" />
@@ -166,6 +167,7 @@ else
     private string doctorFirstName = "";
     private string doctorLastName = "";
     private string doctorMedicalCode = "";
+    private long doctorVisitFeeToman;
     private string doctorClinicId = "";
     private Dictionary<Guid, string> identityUserIds = [];
 
@@ -231,14 +233,14 @@ else
     private void NewDoctor()
     {
         editingDoctorId = null; doctorFirstName = ""; doctorLastName = "";
-        doctorMedicalCode = ""; doctorClinicId = clinics.First(x => x.IsActive).Id.ToString();
+        doctorMedicalCode = ""; doctorVisitFeeToman = 0; doctorClinicId = clinics.First(x => x.IsActive).Id.ToString();
         doctorEditorOpen = true; clinicEditorOpen = false; feedback = null;
     }
 
     private void EditDoctor(AdminDoctorItem doctor)
     {
         editingDoctorId = doctor.Id; doctorFirstName = doctor.FirstName; doctorLastName = doctor.LastName;
-        doctorMedicalCode = doctor.MedicalCode ?? ""; doctorClinicId = doctor.ClinicId.ToString();
+        doctorMedicalCode = doctor.MedicalCode ?? ""; doctorVisitFeeToman = doctor.VisitFeeToman; doctorClinicId = doctor.ClinicId.ToString();
         doctorEditorOpen = true; clinicEditorOpen = false; feedback = null;
     }
 
@@ -270,12 +272,14 @@ else
     {
         if (string.IsNullOrWhiteSpace(doctorFirstName) || string.IsNullOrWhiteSpace(doctorLastName))
         { ShowFeedback("نام و نام خانوادگی پزشک الزامی است.", true); return; }
+        if (doctorVisitFeeToman < 0)
+        { ShowFeedback("مبلغ حق ویزیت نمی‌تواند منفی باشد.", true); return; }
         saving = true;
         AdminMutationResult result;
         if (editingDoctorId is Guid id)
-            result = await ApiClient.UpdateDoctorAsync(id, doctorFirstName.Trim(), doctorLastName.Trim(), NullIfEmpty(doctorMedicalCode));
+            result = await ApiClient.UpdateDoctorAsync(id, doctorFirstName.Trim(), doctorLastName.Trim(), NullIfEmpty(doctorMedicalCode), doctorVisitFeeToman);
         else if (Guid.TryParse(doctorClinicId, out var clinicId))
-            result = await ApiClient.CreateDoctorAsync(clinicId, doctorFirstName.Trim(), doctorLastName.Trim(), NullIfEmpty(doctorMedicalCode));
+            result = await ApiClient.CreateDoctorAsync(clinicId, doctorFirstName.Trim(), doctorLastName.Trim(), NullIfEmpty(doctorMedicalCode), doctorVisitFeeToman);
         else
         {
             saving = false; ShowFeedback("کلینیک پزشک را انتخاب کنید.", true); return;
