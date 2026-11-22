@@ -22,13 +22,13 @@ public static class DoctorEndpoints
 
         group.MapPost("/", async (CreateDoctorRequest request, DoctorService service, CancellationToken ct) =>
         {
-            var errors = Validate(request.FirstName, request.LastName, request.MedicalCode);
+            var errors = Validate(request.FirstName, request.LastName, request.MedicalCode, request.VisitFeeToman);
             if (errors is not null) return Results.ValidationProblem(errors);
             if (request.ClinicId == Guid.Empty)
                 return Results.ValidationProblem(new Dictionary<string, string[]> { ["clinicId"] = ["شناسه کلینیک الزامی است."] });
             try
             {
-                var doctor = await service.CreateAsync(request.ClinicId, request.FirstName, request.LastName, request.MedicalCode, ct);
+                var doctor = await service.CreateAsync(request.ClinicId, request.FirstName, request.LastName, request.MedicalCode, request.VisitFeeToman, ct);
                 return Results.Created($"/api/v1/doctors/{doctor.Id}", doctor);
             }
             catch (ClinicNotFoundException ex)
@@ -47,7 +47,7 @@ public static class DoctorEndpoints
         {
             var errors = Validate(request.FirstName, request.LastName, request.MedicalCode);
             if (errors is not null) return Results.ValidationProblem(errors);
-            var doctor = await service.UpdateAsync(id, request.FirstName, request.LastName, request.MedicalCode, ct);
+            var doctor = await service.UpdateAsync(id, request.FirstName, request.LastName, request.MedicalCode, request.VisitFeeToman, ct);
             return doctor is null ? Results.NotFound() : Results.Ok(doctor);
         })
         .RequireAuthorization(policy => policy.RequireRole(AdminRoles))
@@ -81,7 +81,7 @@ public static class DoctorEndpoints
         return endpoints;
     }
 
-    private static Dictionary<string, string[]>? Validate(string? firstName, string? lastName, string? medicalCode)
+    private static Dictionary<string, string[]>? Validate(string? firstName, string? lastName, string? medicalCode, long visitFeeToman)
     {
         var errors = new Dictionary<string, string[]>();
         if (string.IsNullOrWhiteSpace(firstName)) errors["firstName"] = ["نام پزشک الزامی است."];
@@ -90,12 +90,14 @@ public static class DoctorEndpoints
         else if (lastName.Trim().Length > 100) errors["lastName"] = ["نام خانوادگی حداکثر ۱۰۰ کاراکتر است."];
         if (!string.IsNullOrWhiteSpace(medicalCode) && medicalCode.Trim().Length > 50)
             errors["medicalCode"] = ["کد نظام پزشکی حداکثر ۵۰ کاراکتر است."];
+        if (visitFeeToman < 0)
+            errors["visitFeeToman"] = ["مبلغ حق ویزیت نمی‌تواند منفی باشد."];
         return errors.Count == 0 ? null : errors;
     }
 }
 
-public sealed record CreateDoctorRequest(Guid ClinicId, string FirstName, string LastName, string? MedicalCode);
-public sealed record UpdateDoctorRequest(string FirstName, string LastName, string? MedicalCode);
+public sealed record CreateDoctorRequest(Guid ClinicId, string FirstName, string LastName, string? MedicalCode, long VisitFeeToman);
+public sealed record UpdateDoctorRequest(string FirstName, string LastName, string? MedicalCode, long VisitFeeToman);
 public sealed record SetDoctorActiveRequest(bool IsActive);
 
 public sealed record LinkDoctorIdentityRequest(string? IdentityUserId);
