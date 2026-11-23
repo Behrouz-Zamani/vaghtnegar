@@ -27,10 +27,14 @@ public static class AppointmentPaymentEndpoints
                 return Results.BadRequest(new { message = "برای نگه‌داشتن زمان، نوبت باید حداقل ۱۰ دقیقه بعد از زمان فعلی باشد." });
             try
             {
+                var doctor = await db.Doctors.AsNoTracking()
+                    .FirstOrDefaultAsync(x => x.Id == request.DoctorId && x.IsActive, ct);
+                if (doctor is null) return Results.NotFound(new { message = "پزشک فعال یافت نشد." });
+                if (doctor.VisitFeeToman <= 0)
+                    return Results.BadRequest(new { message = "حق ویزیت این پزشک هنوز در پنل مدیریت تعیین نشده است." });
+
                 var appointment = await booking.BookAsync(request.DoctorId, subject,
                     new BookAppointmentRequest(request.StartsAtUtc, request.PatientNote), ct);
-                var doctor = await db.Doctors.AsNoTracking().FirstOrDefaultAsync(x => x.Id == request.DoctorId, ct);
-                if (doctor is null) return Results.NotFound(new { message = "پزشک یافت نشد." });
 
                 var payment = new AppointmentPayment(appointment.Id, appointment.PatientId, appointment.DoctorId,
                     doctor.VisitFeeToman, DateTimeOffset.UtcNow.AddMinutes(10));
