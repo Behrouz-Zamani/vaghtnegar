@@ -36,11 +36,13 @@
     {
         <div class="table-wrap">
             <table>
-                <thead><tr><th>پزشک</th><th>زمان نوبت</th><th>مبلغ (تومان)</th><th>زمان ارسال رسید</th><th>رسید</th><th>عملیات</th></tr></thead>
+                <thead><tr><th>بیمار</th><th>موبایل</th><th>پزشک</th><th>زمان نوبت</th><th>مبلغ (تومان)</th><th>زمان ارسال رسید</th><th>رسید</th><th>عملیات</th></tr></thead>
                 <tbody>
                     @foreach (var item in requests)
                     {
                         <tr>
+                            <td>@item.PatientFullName</td>
+                            <td dir="ltr">@item.PatientMobileNumber</td>
                             <td>دکتر @item.DoctorFullName</td>
                             <td>@item.StartsAtUtc.ToLocalTime().ToString("yyyy/MM/dd HH:mm")</td>
                             <td>@item.VisitFeeToman.ToString("N0")</td>
