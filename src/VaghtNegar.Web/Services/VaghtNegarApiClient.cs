@@ -57,6 +57,14 @@ public sealed class VaghtNegarApiClient(IJSRuntime jsRuntime)
     public Task<ApiReadResult<BookingRequestsPageDto>> GetMyBookingRequestsAsync(int page = 1, CancellationToken ct = default) =>
         RequestItemResultAsync<BookingRequestsPageDto>("GET", $"bff/api/v1/booking-requests/me?page={page}&pageSize=20", null, ct);
 
+    public Task<ApiReadResult<BookingRequestDto>> GetMyBookingRequestAsync(Guid requestId, CancellationToken ct = default) =>
+        RequestItemResultAsync<BookingRequestDto>("GET", $"bff/api/v1/me/booking-requests/{requestId}", null, ct);
+
+    public Task<AdminMutationResult> SubmitMyBookingReceiptAsync(
+        Guid requestId, string fileName, string contentType, string base64Content, CancellationToken ct = default) =>
+        SendAsync("POST", $"bff/api/v1/me/booking-requests/{requestId}/receipt",
+            new SubmitPaymentReceiptRequest(fileName, contentType, base64Content), ct);
+
     public Task<ApiReadResult<BookingRequestsPageDto>> GetPendingBookingReviewsAsync(int page = 1, CancellationToken ct = default) =>
         RequestItemResultAsync<BookingRequestsPageDto>("GET", $"bff/api/v1/admin/booking-requests/pending-review?page={page}&pageSize=20", null, ct);
 
