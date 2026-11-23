@@ -207,12 +207,18 @@ public sealed class VaghtNegarApiClient(IJSRuntime jsRuntime)
         }
     }
 
-    public async Task<List<PatientListItem>> GetPatientsAsync(string? search, CancellationToken ct = default)
+    public Task<ApiReadResult<List<PatientListItem>>> GetPatientsResultAsync(string? search, CancellationToken ct = default)
     {
         var path = "bff/api/v1/patients/";
         if (!string.IsNullOrWhiteSpace(search))
             path += "?search=" + Uri.EscapeDataString(search.Trim());
-        return await TryGetCollectionAsync<PatientListItem>(path, ct);
+        return TryGetCollectionResultAsync<PatientListItem>(path, ct);
+    }
+
+    public async Task<List<PatientListItem>> GetPatientsAsync(string? search, CancellationToken ct = default)
+    {
+        var result = await GetPatientsResultAsync(search, ct);
+        return result.Succeeded && result.Data is not null ? result.Data : [];
     }
 
     public Task<AdminMutationResult> CreatePatientAsync(
