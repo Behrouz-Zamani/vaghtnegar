@@ -1,5 +1,6 @@
 @page "/patient"
 @using System.Globalization
+@using Microsoft.AspNetCore.Components.Forms
 @attribute [Authorize(Roles = "Patient")]
 @inject VaghtNegarApiClient ApiClient
 
@@ -165,10 +166,38 @@ else
                 {
                     <div class="patient-confirm-booking">
                         <span>زمان انتخابی: <strong>@selectedSlot.StartTime تا @selectedSlot.EndTime</strong></span>
-                        <button class="btn btn-primary" disabled="@booking" @onclick="BookAsync">@(booking ? "در حال ثبت..." : "ثبت نهایی نوبت")</button>
+                        <button class="btn btn-primary" disabled="@booking" @onclick="BookAsync">@(booking ? "در حال ایجاد درخواست..." : "ادامه و پرداخت حق‌ویزیت")</button>
                     </div>
                 }
             }
+        }
+        @if (checkout is not null)
+        {
+            <div class="panel-card patient-section">
+                <div class="panel-heading">
+                    <div><span class="eyebrow">پرداخت حق‌ویزیت</span><h2>مبلغ قابل پرداخت: @checkout.AmountToman.ToString("N0") تومان</h2></div>
+                </div>
+                <p>این ساعت تا <strong>@checkout.ExpiresAtUtc.ToLocalTime().ToString("HH:mm:ss")</strong> برای شما نگه داشته شده است. لطفاً پیش از پایان مهلت واریز و رسید را ارسال کنید.</p>
+                <div class="patient-booking-grid">
+                    <div><small>بانک</small><strong>@(string.IsNullOrWhiteSpace(checkout.BankName) ? "اطلاعات بانکی در تنظیمات ثبت نشده" : checkout.BankName)</strong></div>
+                    <div><small>صاحب حساب</small><strong>@checkout.AccountHolder</strong></div>
+                    <div><small>شماره کارت</small><strong dir="ltr">@checkout.CardNumber</strong></div>
+                    <div><small>شماره شبا</small><strong dir="ltr">@checkout.Iban</strong></div>
+                </div>
+                <label>شماره پیگیری / شرح واریز
+                    <input class="admin-input" @bind="receiptReference" maxlength="100" placeholder="شماره پیگیری تراکنش" />
+                </label>
+                <label>تصویر رسید (JPG / PNG / WEBP، حداکثر ۱ مگابایت)
+                    <InputFile OnChange="ReadReceiptAsync" accept="image/jpeg,image/png,image/webp" />
+                </label>
+                @if (!string.IsNullOrWhiteSpace(receiptFileName))
+                {
+                    <small>فایل انتخاب‌شده: @receiptFileName</small>
+                }
+                <div class="admin-form-actions">
+                    <button class="btn btn-primary" disabled="@submittingReceipt" @onclick="SubmitReceiptAsync">@(submittingReceipt ? "در حال ارسال..." : "ارسال رسید برای بررسی")</button>
+                </div>
+            </div>
         }
         }
     </section>
@@ -188,6 +217,12 @@ else
     private bool loadingSlots;
     private bool slotsLoaded;
     private bool booking;
+    private bool submittingReceipt;
+    private AppointmentCheckoutDto? checkout;
+    private string receiptReference = "";
+    private string? receiptContentType;
+    private string? receiptImageBase64;
+    private string? receiptFileName;
     private Guid? cancellingId;
     private bool feedbackIsError;
     private string? feedback;
@@ -306,16 +341,64 @@ else
     {
         if (selectedSlot is null || !Guid.TryParse(selectedDoctorId, out var doctorId)) return;
         booking = true;
-        var result = await ApiClient.BookMyAppointmentAsync(doctorId, selectedSlot.StartsAtUtc, patientNote);
+        var result = await ApiClient.CreateAppointmentCheckoutAsync(doctorId, selectedSlot.StartsAtUtc, patientNote);
         booking = false;
-        ShowFeedback(result.Succeeded ? "نوبت با موفقیت ثبت شد." : result.Message, !result.Succeeded);
-        if (result.Succeeded)
+        if (!result.Succeeded || result.Data is null)
         {
-            selectedSlot = null;
-            slotsLoaded = false;
-            patientNote = null;
-            await LoadAppointmentsAsync();
+            ShowFeedback(result.Error ?? "ایجاد درخواست پرداخت ناموفق بود.", true);
+            return;
         }
+        checkout = result.Data;
+        receiptReference = "";
+        receiptContentType = null;
+        receiptImageBase64 = null;
+        receiptFileName = null;
+        ShowFeedback("زمان نوبت برای ۱۰ دقیقه نگه داشته شد. پس از واریز، تصویر رسید را ارسال کنید.", false);
+        selectedSlot = null;
+        slotsLoaded = false;
+    }
+
+    private async Task ReadReceiptAsync(InputFileChangeEventArgs e)
+    {
+        try
+        {
+            var file = e.File;
+            if (file.Size > 1_048_576)
+            {
+                ShowFeedback("حجم تصویر رسید نباید بیشتر از یک مگابایت باشد.", true);
+                return;
+            }
+            if (file.ContentType is not ("image/jpeg" or "image/png" or "image/webp"))
+            {
+                ShowFeedback("فرمت تصویر باید JPG، PNG یا WEBP باشد.", true);
+                return;
+            }
+            await using var stream = file.OpenReadStream(1_048_576);
+            using var memory = new MemoryStream();
+            await stream.CopyToAsync(memory);
+            receiptImageBase64 = Convert.ToBase64String(memory.ToArray());
+            receiptContentType = file.ContentType;
+            receiptFileName = file.Name;
+        }
+        catch (Exception)
+        {
+            ShowFeedback("خواندن تصویر رسید ناموفق بود.", true);
+        }
+    }
+
+    private async Task SubmitReceiptAsync()
+    {
+        if (checkout is null) return;
+        if (string.IsNullOrWhiteSpace(receiptReference) || string.IsNullOrWhiteSpace(receiptImageBase64) || string.IsNullOrWhiteSpace(receiptContentType))
+        {
+            ShowFeedback("شماره پیگیری و تصویر رسید را وارد کنید.", true);
+            return;
+        }
+        submittingReceipt = true;
+        var result = await ApiClient.SubmitAppointmentReceiptAsync(checkout.Id, receiptReference, receiptContentType, receiptImageBase64);
+        submittingReceipt = false;
+        ShowFeedback(result.Message, !result.Succeeded);
+        if (result.Succeeded) checkout = null;
     }
 
     private bool CanCancel(PatientAppointmentDto item) =>
