@@ -18,6 +18,35 @@ partial class VaghtNegarDbContextModelSnapshot : ModelSnapshot
             .HasAnnotation("ProductVersion", "10.0.0")
             .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
+        modelBuilder.Entity<VaghtNegar.Domain.Entities.AppointmentBookingRequest>(entity =>
+        {
+            entity.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("uniqueidentifier");
+            entity.Property<Guid>("ClinicId").HasColumnType("uniqueidentifier");
+            entity.Property<Guid>("DoctorId").HasColumnType("uniqueidentifier");
+            entity.Property<Guid?>("PatientId").HasColumnType("uniqueidentifier");
+            entity.Property<string>("IdentityUserId").HasMaxLength(128).HasColumnType("nvarchar(128)");
+            entity.Property<DateTimeOffset>("StartsAtUtc").HasColumnType("datetimeoffset");
+            entity.Property<DateTimeOffset>("EndsAtUtc").HasColumnType("datetimeoffset");
+            entity.Property<long>("VisitFeeToman").HasColumnType("bigint");
+            entity.Property<string>("PatientNote").HasMaxLength(1000).HasColumnType("nvarchar(1000)");
+            entity.Property<string>("AccessTokenHash").IsRequired().HasMaxLength(128).HasColumnType("nvarchar(128)");
+            entity.Property<AppointmentBookingRequestStatus>("Status").HasColumnType("int");
+            entity.Property<DateTimeOffset>("CreatedAtUtc").HasColumnType("datetimeoffset");
+            entity.Property<DateTimeOffset>("HoldExpiresAtUtc").HasColumnType("datetimeoffset");
+            entity.Property<byte[]>("ReceiptContent").HasColumnType("varbinary(max)");
+            entity.Property<string>("ReceiptContentType").HasMaxLength(100).HasColumnType("nvarchar(100)");
+            entity.Property<string>("ReceiptFileName").HasMaxLength(180).HasColumnType("nvarchar(180)");
+            entity.Property<DateTimeOffset?>("ReceiptSubmittedAtUtc").HasColumnType("datetimeoffset");
+            entity.Property<string>("AdminNote").HasMaxLength(1000).HasColumnType("nvarchar(1000)");
+            entity.Property<DateTimeOffset?>("ReviewedAtUtc").HasColumnType("datetimeoffset");
+            entity.Property<string>("ReviewedByIdentityUserId").HasMaxLength(128).HasColumnType("nvarchar(128)");
+            entity.HasKey("Id");
+            entity.HasIndex("AccessTokenHash").IsUnique();
+            entity.HasIndex("DoctorId", "StartsAtUtc", "Status");
+            entity.HasIndex("PatientId", "CreatedAtUtc");
+            entity.ToTable("AppointmentBookingRequests");
+        });
+
         modelBuilder.Entity<VaghtNegar.Domain.Entities.Appointment>(entity =>
         {
             entity.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("uniqueidentifier");
