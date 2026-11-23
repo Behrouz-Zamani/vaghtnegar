@@ -76,7 +76,8 @@ public sealed class PatientService(IPatientRepository repository)
         new((mobileNumber ?? string.Empty).Where(c => !char.IsWhiteSpace(c)).ToArray());
 
     private static PatientDto ToDto(Patient x) =>
-        new(x.Id, x.FirstName, x.LastName, x.MobileNumber, x.BirthDate, x.IsActive, x.CreatedAtUtc, x.UpdatedAtUtc);
+        new(x.Id, x.FirstName, x.LastName, x.MobileNumber, x.BirthDate, x.IsActive,
+            !string.IsNullOrWhiteSpace(x.IdentityUserId), x.CreatedAtUtc, x.UpdatedAtUtc);
 }
 
 public sealed class PatientMobileAlreadyExistsException(string mobileNumber)
