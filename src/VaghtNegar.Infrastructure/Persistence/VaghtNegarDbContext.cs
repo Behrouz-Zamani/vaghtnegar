@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using VaghtNegar.Domain.Entities;
+using VaghtNegar.Domain.Entities;
 
 namespace VaghtNegar.Infrastructure.Persistence;
 
@@ -9,6 +10,7 @@ public sealed class VaghtNegarDbContext(DbContextOptions<VaghtNegarDbContext> op
     public DbSet<Doctor> Doctors => Set<Doctor>();
     public DbSet<Patient> Patients => Set<Patient>();
     public DbSet<Appointment> Appointments => Set<Appointment>();
+    public DbSet<AppointmentPayment> AppointmentPayments => Set<AppointmentPayment>();
     public DbSet<DoctorWorkingHour> DoctorWorkingHours => Set<DoctorWorkingHour>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -59,6 +61,22 @@ public sealed class VaghtNegarDbContext(DbContextOptions<VaghtNegarDbContext> op
             entity.Property(x => x.PatientNote).HasMaxLength(1000);
             entity.HasIndex(x => new { x.DoctorId, x.StartsAtUtc });
             entity.HasIndex(x => new { x.ClinicId, x.StartsAtUtc });
+        });
+
+        modelBuilder.Entity<AppointmentPayment>(entity =>
+        {
+            entity.ToTable("AppointmentPayments");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Status).HasConversion<int>();
+            entity.Property(x => x.ReceiptReference).HasMaxLength(100);
+            entity.Property(x => x.ReceiptContentType).HasMaxLength(50);
+            entity.Property(x => x.ReviewedBy).HasMaxLength(128);
+            entity.Property(x => x.ReviewNote).HasMaxLength(500);
+            entity.HasIndex(x => x.AppointmentId).IsUnique();
+            entity.HasIndex(x => x.ExpiresAtUtc);
+            entity.HasIndex(x => new { x.PatientId, x.CreatedAtUtc });
+            entity.HasIndex(x => new { x.Status, x.ExpiresAtUtc });
+            entity.HasOne(x => x.Appointment).WithMany().HasForeignKey(x => x.AppointmentId).OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<DoctorWorkingHour>(entity =>
