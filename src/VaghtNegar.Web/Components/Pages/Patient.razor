@@ -107,69 +107,41 @@ else
 
     <section class="panel-card patient-section">
         <div class="panel-heading">
-            <div><span class="eyebrow">نوبت‌دهی آنلاین</span><h2>دریافت نوبت جدید</h2></div>
+            <div><span class="eyebrow">درخواست‌های نوبت و پرداخت</span><h2>وضعیت درخواست‌های جدید</h2></div>
+            <a class="btn btn-primary" href="/book">＋ دریافت نوبت جدید</a>
         </div>
-        @if (doctorsError is not null)
+        @if (bookingRequestsLoading)
         {
-            <div class="notice-card" role="alert">
-                <p>@doctorsError</p>
-                <button class="btn btn-outline" @onclick="LoadDoctorsAsync">تلاش مجدد</button>
-            </div>
+            <div class="loading-line"><span></span> در حال دریافت درخواست‌ها...</div>
+        }
+        else if (bookingRequestsError is not null)
+        {
+            <div class="notice-card" role="alert">@bookingRequestsError</div>
+        }
+        else if (bookingRequests.Count == 0)
+        {
+            <div class="empty-inline">درخواست پرداختی ثبت نشده است. برای دریافت نوبت جدید از دکمه بالا استفاده کنید.</div>
         }
         else
         {
-        <div class="patient-booking-grid">
-            <label>پزشک
-                <select class="admin-input" @bind="selectedDoctorId">
-                    <option value="">انتخاب پزشک</option>
-                    @foreach (var doctor in doctors.Where(x => x.IsActive))
-                    {
-                        <option value="@doctor.Id">دکتر @doctor.FirstName @doctor.LastName</option>
-                    }
-                </select>
-            </label>
-            <label>تاریخ مراجعه (شمسی)
-                <input class="admin-input" @bind="jalaliDate" placeholder="۱۴۰۵/۰۹/۰۱" />
-            </label>
-            <label class="patient-note-field">توضیحات (اختیاری)
-                <input class="admin-input" @bind="patientNote" maxlength="1000" placeholder="علت مراجعه یا توضیح کوتاه" />
-            </label>
-        </div>
-        <div class="patient-booking-actions">
-            <button class="btn btn-primary" disabled="@loadingSlots" @onclick="LoadSlotsAsync">نمایش ساعت‌های آزاد</button>
-        </div>
-        @if (slotsError is not null)
-        {
-            <div class="notice-card" role="alert">
-                <p>@slotsError</p>
-                <button class="btn btn-outline" @onclick="LoadSlotsAsync">تلاش مجدد</button>
-            </div>
-        }
-        @if (slotsLoaded && slotsError is null)
-        {
-            @if (availableSlots.Count == 0)
-            {
-                <div class="empty-inline">برای این پزشک در تاریخ انتخاب‌شده ساعت آزادی وجود ندارد.</div>
-            }
-            else
-            {
-                <div class="patient-slot-grid">
-                    @foreach (var slot in availableSlots)
-                    {
-                        <button class="patient-slot @(selectedSlot == slot ? "selected" : "")" @onclick="() => selectedSlot = slot">
-                            @slot.StartTime
-                        </button>
-                    }
-                </div>
-                @if (selectedSlot is not null)
+            <div class="patient-appointments">
+                @foreach (var request in bookingRequests)
                 {
-                    <div class="patient-confirm-booking">
-                        <span>زمان انتخابی: <strong>@selectedSlot.StartTime تا @selectedSlot.EndTime</strong></span>
-                        <button class="btn btn-primary" disabled="@booking" @onclick="BookAsync">@(booking ? "در حال ثبت..." : "ثبت نهایی نوبت")</button>
-                    </div>
+                    <article class="patient-appointment">
+                        <div class="patient-appointment-date">
+                            <strong>@FormatJalali(request.StartsAtUtc)</strong>
+                            <span>@FormatTehran(request.StartsAtUtc)</span>
+                        </div>
+                        <div class="patient-appointment-main">
+                            <strong>دکتر @request.DoctorFullName</strong>
+                            <span>حق‌ویزیت: @request.VisitFeeToman.ToString("N0") تومان</span>
+                        </div>
+                        <div class="patient-appointment-actions">
+                            <span class="soft-status">@BookingStatusText(request.Status)</span>
+                        </div>
+                    </article>
                 }
-            }
-        }
+            </div>
         }
     </section>
 }
@@ -178,6 +150,7 @@ else
     private PatientProfileDto? profile;
     private PatientAppointmentsPageDto appointments = new([], 1, 20, 0, 0);
     private List<AdminDoctorItem> doctors = [];
+    private List<BookingRequestDto> bookingRequests = [];
     private List<AvailableSlotItem> availableSlots = [];
     private string? selectedDoctorId;
     private string jalaliDate = "";
@@ -186,6 +159,7 @@ else
     private bool loading = true;
     private bool appointmentsLoading;
     private bool loadingSlots;
+    private bool bookingRequestsLoading;
     private bool slotsLoaded;
     private bool booking;
     private Guid? cancellingId;
@@ -195,6 +169,7 @@ else
     private string? appointmentsError;
     private string? doctorsError;
     private string? slotsError;
+    private string? bookingRequestsError;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -222,10 +197,33 @@ else
         {
             jalaliDate = TodayJalali();
             await LoadAppointmentsAsync();
-            await LoadDoctorsAsync();
+            await LoadBookingRequestsAsync();
         }
         loading = false;
     }
+
+    private async Task LoadBookingRequestsAsync()
+    {
+        bookingRequestsLoading = true;
+        bookingRequestsError = null;
+        var result = await ApiClient.GetMyBookingRequestsAsync();
+        if (result.Succeeded && result.Data is not null)
+            bookingRequests = result.Data.Items.ToList();
+        else
+            bookingRequestsError = result.Error ?? "دریافت درخواست‌های پرداخت ناموفق بود.";
+        bookingRequestsLoading = false;
+    }
+
+    private static string BookingStatusText(string status) => status switch
+    {
+        "AwaitingLogin" => "در انتظار ورود",
+        "AwaitingPayment" => "در انتظار پرداخت",
+        "AwaitingReview" => "در انتظار تأیید رسید",
+        "Approved" => "نوبت قطعی",
+        "Rejected" => "رسید رد شده",
+        "Expired" => "مهلت رزرو تمام شده",
+        _ => status
+    };
 
     private async Task LoadDoctorsAsync()
     {
