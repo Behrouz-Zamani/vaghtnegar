@@ -114,6 +114,17 @@ public sealed class AppointmentPaymentWorkflow(
         var patientId = await db.Patients.Where(x => x.IdentityUserId == identityUserId && x.IsActive)
             .Select(x => (Guid?)x.Id).FirstOrDefaultAsync(ct);
         if (!patientId.HasValue) return new BookingRequestsPageDto([], page, pageSize, 0, 0);
+
+        var now = DateTimeOffset.UtcNow;
+        var expired = await db.AppointmentBookingRequests
+            .Where(x => x.PatientId == patientId.Value &&
+                (x.Status == AppointmentBookingRequestStatus.AwaitingLogin ||
+                 x.Status == AppointmentBookingRequestStatus.AwaitingPayment) &&
+                x.HoldExpiresAtUtc <= now)
+            .ToListAsync(ct);
+        foreach (var item in expired) item.ExpireIfNeeded(now);
+        if (expired.Count > 0) await db.SaveChangesAsync(ct);
+
         return await GetPageAsync(
             db.AppointmentBookingRequests.Where(x => x.PatientId == patientId.Value),
             page, pageSize, ct);
