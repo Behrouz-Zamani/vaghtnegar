@@ -9,8 +9,6 @@ using VaghtNegar.Infrastructure.Persistence;
 
 namespace VaghtNegar.Infrastructure.Persistence.Migrations;
 
-[DbContext(typeof(VaghtNegarDbContext))]
-[Migration("20261123140000_CreateAppointmentBookingRequests")]
 partial class CreateAppointmentBookingRequests : Migration
 {
     protected override void BuildModel(ModelBuilder modelBuilder)
