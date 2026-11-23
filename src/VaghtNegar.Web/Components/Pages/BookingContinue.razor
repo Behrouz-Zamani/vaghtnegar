@@ -1,0 +1,189 @@
+@page "/booking/continue"
+@using Microsoft.AspNetCore.Components.Forms
+@using VaghtNegar.Web.Services
+@attribute [Authorize(Roles = "Patient")]
+@inject VaghtNegarApiClient ApiClient
+@inject NavigationManager Navigation
+@inject IConfiguration Configuration
+
+<PageTitle>تکمیل پرداخت نوبت | وقت‌نگار</PageTitle>
+
+<section class="page-heading">
+    <span class="eyebrow">تکمیل درخواست نوبت</span>
+    <h1>پرداخت حق‌ویزیت و ارسال رسید</h1>
+    <p class="page-lead">پس از ورود، درخواست موقت به حساب شما متصل می‌شود. نوبت فقط پس از تأیید رسید توسط مدیریت قطعی خواهد شد.</p>
+</section>
+
+@if (loading)
+{
+    <div class="panel-card loading-line"><span></span> در حال بازیابی درخواست شما...</div>
+}
+else if (!string.IsNullOrWhiteSpace(error))
+{
+    <div class="notice-card" role="alert">@error</div>
+}
+else if (booking is not null)
+{
+    <section class="panel-card patient-section">
+        <div class="panel-heading"><div><span class="eyebrow">خلاصه درخواست</span><h2>دکتر @booking.DoctorFullName</h2></div></div>
+        <div class="stats-grid">
+            <article class="stat-card"><div><span>مبلغ حق‌ویزیت</span><strong>@booking.VisitFeeToman.ToString("N0")</strong><small>تومان</small></div></article>
+            <article class="stat-card"><div><span>مهلت نگه‌داری</span><strong>@booking.HoldExpiresAtUtc.ToLocalTime().ToString("HH:mm:ss")</strong><small>پایان مهلت پرداخت</small></div></article>
+            <article class="stat-card"><div><span>وضعیت درخواست</span><strong>@StatusText(booking.Status)</strong><small>@booking.StartsAtUtc.ToLocalTime().ToString("yyyy/MM/dd HH:mm")</small></div></article>
+        </div>
+
+        @if (booking.Status == "AwaitingPayment")
+        {
+            <div class="notice-card">
+                <strong>واریز کارت‌به‌کارت</strong>
+                <p>لطفاً مبلغ دقیق بالا را به حساب اعلام‌شده توسط کلینیک واریز کنید و تصویر رسید را همین‌جا ارسال کنید.</p>
+                @if (string.IsNullOrWhiteSpace(Configuration["Payment:CardNumber"]))
+                {
+                    <p>اطلاعات کارت مقصد هنوز در تنظیمات سامانه ثبت نشده است. برای جلوگیری از واریز اشتباه، تا ثبت شماره کارت از مدیریت کلینیک اطلاعات حساب را دریافت کنید.</p>
+                }
+                else
+                {
+                    <p>شماره کارت: <strong dir="ltr">@Configuration["Payment:CardNumber"]</strong></p>
+                    <p>به نام: <strong>@Configuration["Payment:AccountHolder"]</strong></p>
+                    <p>بانک: <strong>@Configuration["Payment:BankName"]</strong></p>
+                }
+            </div>
+            <label>تصویر رسید (JPG، PNG یا WebP، حداکثر ۵ مگابایت)
+                <InputFile OnChange="ReceiptChanged" accept="image/jpeg,image/png,image/webp" />
+            </label>
+            @if (!string.IsNullOrWhiteSpace(receiptName))
+            {
+                <p>فایل انتخاب‌شده: @receiptName</p>
+                <button class="btn btn-primary" disabled="@submitting" @onclick="SubmitReceiptAsync">
+                    @(submitting ? "در حال ارسال..." : "ارسال رسید برای تأیید")
+                </button>
+            }
+        }
+        else if (booking.Status == "AwaitingReview")
+        {
+            <div class="admin-feedback success">رسید شما دریافت شد و درخواست تا بررسی مدیریت نگه داشته می‌شود. پس از تأیید، نوبت قطعی خواهد شد.</div>
+        }
+        else if (booking.Status == "Approved")
+        {
+            <div class="admin-feedback success">پرداخت تأیید شد و نوبت شما قطعی است.</div>
+            <a class="btn btn-primary" href="/patient">مشاهده پنل بیمار</a>
+        }
+        else
+        {
+            <div class="notice-card">@StatusText(booking.Status) @booking.AdminNote</div>
+            <a class="btn btn-primary" href="/book">انتخاب زمان جدید</a>
+        }
+    </section>
+}
+
+@code {
+    [SupplyParameterFromQuery(Name = "token")]
+    public string? Token { get; set; }
+
+    [SupplyParameterFromQuery(Name = "id")]
+    public Guid? RequestId { get; set; }
+
+    private BookingRequestDto? booking;
+    private bool loading = true;
+    private bool submitting;
+    private string? error;
+    private string? receiptName;
+    private string? receiptContentType;
+    private string? receiptBase64;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        if (!string.IsNullOrWhiteSpace(Token))
+        {
+            var claim = await ApiClient.ClaimBookingHoldAsync(Token);
+            if (!claim.Succeeded)
+            {
+                error = claim.Error ?? "اتصال درخواست به حساب کاربری انجام نشد.";
+                loading = false;
+                StateHasChanged();
+                return;
+            }
+            booking = claim.Data;
+            RequestId = booking?.Id;
+        }
+        else if (RequestId.HasValue)
+        {
+            var result = await ApiClient.GetMyBookingRequestAsync(RequestId.Value);
+            if (!result.Succeeded)
+                error = result.Error ?? "درخواست نوبت یافت نشد.";
+            else
+                booking = result.Data;
+        }
+        else
+        {
+            error = "شناسه درخواست یا شناسه پیگیری موجود نیست.";
+        }
+
+        loading = false;
+        StateHasChanged();
+    }
+
+    private async Task ReceiptChanged(InputFileChangeEventArgs e)
+    {
+        error = null;
+        var file = e.File;
+        if (file.Size <= 0 || file.Size > 5 * 1024 * 1024)
+        {
+            error = "حجم تصویر باید حداکثر ۵ مگابایت باشد.";
+            return;
+        }
+        if (file.ContentType is not ("image/jpeg" or "image/png" or "image/webp"))
+        {
+            error = "فقط تصویر JPG، PNG یا WebP پذیرفته می‌شود.";
+            return;
+        }
+
+        await using var stream = file.OpenReadStream(5 * 1024 * 1024);
+        using var memory = new MemoryStream();
+        await stream.CopyToAsync(memory);
+        receiptName = file.Name;
+        receiptContentType = file.ContentType;
+        receiptBase64 = Convert.ToBase64String(memory.ToArray());
+    }
+
+    private async Task SubmitReceiptAsync()
+    {
+        if ((!RequestId.HasValue && string.IsNullOrWhiteSpace(Token)) || string.IsNullOrWhiteSpace(receiptBase64) ||
+            string.IsNullOrWhiteSpace(receiptName) || string.IsNullOrWhiteSpace(receiptContentType)) return;
+        submitting = true;
+        var result = RequestId.HasValue
+            ? await ApiClient.SubmitMyBookingReceiptAsync(RequestId.Value, receiptName, receiptContentType, receiptBase64)
+            : await ApiClient.SubmitBookingReceiptAsync(Token!, receiptName, receiptContentType, receiptBase64);
+        submitting = false;
+        if (!result.Succeeded)
+        {
+            error = result.Message;
+            return;
+        }
+        if (RequestId.HasValue)
+        {
+            var refreshed = await ApiClient.GetMyBookingRequestAsync(RequestId.Value);
+            booking = refreshed.Data;
+        }
+        else
+        {
+            var refreshed = await ApiClient.GetBookingHoldAsync(Token!);
+            booking = refreshed.Data;
+        }
+        receiptBase64 = null;
+        receiptName = null;
+        error = null;
+    }
+
+    private static string StatusText(string status) => status switch
+    {
+        "AwaitingLogin" => "در انتظار ورود",
+        "AwaitingPayment" => "در انتظار پرداخت",
+        "AwaitingReview" => "در انتظار تأیید مدیریت",
+        "Approved" => "نوبت قطعی",
+        "Rejected" => "رسید رد شده",
+        "Expired" => "مهلت رزرو تمام شده",
+        _ => status
+    };
+}

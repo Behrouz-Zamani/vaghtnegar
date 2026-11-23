@@ -5,12 +5,20 @@
 
     <div class="nav-section-label">خدمات سامانه</div>
 
+    <NavLink href="/book" class="nav-link">
+        <span class="nav-icon">＋</span><span>دریافت نوبت آنلاین</span>
+    </NavLink>
     <NavLink href="/reception" class="nav-link">
         <span class="nav-icon">▤</span><span>پذیرش و نوبت‌ها</span>
     </NavLink>
-    <NavLink href="/admin" class="nav-link">
-        <span class="nav-icon">⚙</span><span>مدیریت کلینیک</span>
-    </NavLink>
+    <AuthorizeView Roles="ClinicAdmin,SuperAdmin">
+        <NavLink href="/admin" class="nav-link">
+            <span class="nav-icon">⚙</span><span>مدیریت کلینیک</span>
+        </NavLink>
+        <NavLink href="/admin/payments" class="nav-link">
+            <span class="nav-icon">▧</span><span>بررسی پرداخت‌ها</span>
+        </NavLink>
+    </AuthorizeView>
     <NavLink href="/patient" class="nav-link">
         <span class="nav-icon">♡</span><span>پنل بیمار</span>
     </NavLink>

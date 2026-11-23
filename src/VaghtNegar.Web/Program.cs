@@ -152,6 +152,36 @@ app.MapGet("/account/logout", async (HttpContext context) =>
         [OpenIdConnectDefaults.AuthenticationScheme]);
 }).RequireAuthorization();
 
+// Anonymous proxy is deliberately restricted to public doctor discovery and booking-hold endpoints.
+app.MapMethods("/public-bff/{**path}", ["GET", "POST"], async (
+    HttpContext context,
+    IHttpClientFactory clients,
+    string? path,
+    CancellationToken cancellationToken) =>
+{
+    var allowed = !string.IsNullOrWhiteSpace(path) &&
+        (path.Equals("api/v1/doctors", StringComparison.OrdinalIgnoreCase) ||
+         path.StartsWith("api/v1/doctors/", StringComparison.OrdinalIgnoreCase) &&
+         path.Contains("/schedule/available-slots", StringComparison.OrdinalIgnoreCase) ||
+         path.StartsWith("api/v1/booking-requests/", StringComparison.OrdinalIgnoreCase));
+    if (!allowed) return Results.NotFound();
+
+    var target = new Uri(new Uri(apiBaseUrl), path + context.Request.QueryString);
+    using var outgoing = new HttpRequestMessage(new HttpMethod(context.Request.Method), target);
+    if (context.Request.ContentLength is > 0 || context.Request.Headers.ContainsKey("Transfer-Encoding"))
+    {
+        outgoing.Content = new StreamContent(context.Request.Body);
+        if (!string.IsNullOrWhiteSpace(context.Request.ContentType))
+            outgoing.Content.Headers.TryAddWithoutValidation("Content-Type", context.Request.ContentType);
+    }
+
+    using var response = await clients.CreateClient("VaghtNegarApi")
+        .SendAsync(outgoing, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+    var payload = await response.Content.ReadAsStringAsync(cancellationToken);
+    return Results.Content(payload, response.Content.Headers.ContentType?.ToString() ?? "application/json",
+        System.Text.Encoding.UTF8, (int)response.StatusCode);
+}).AllowAnonymous();
+
 // A fixed-origin backend-for-frontend proxy. The destination host is configured by the server,
 // never supplied by the browser. API authorization remains enforced by the API itself.
 app.MapMethods("/bff/{**path}", ["GET", "POST", "PUT", "PATCH"], async (

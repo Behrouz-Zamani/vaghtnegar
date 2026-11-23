@@ -62,6 +62,7 @@ public sealed class SchedulingService(ISchedulingRepository repository)
         var dayStartUtc = new DateTimeOffset(TimeZoneInfo.ConvertTimeToUtc(localStart, zone), TimeSpan.Zero);
         var dayEndUtc = new DateTimeOffset(TimeZoneInfo.ConvertTimeToUtc(localEnd, zone), TimeSpan.Zero);
         var appointments = await repository.GetAppointmentsForDayAsync(doctorId, dayStartUtc, dayEndUtc, ct);
+        var bookingRequests = await repository.GetBookingRequestsForDayAsync(doctorId, dayStartUtc, dayEndUtc, ct);
         var result = new List<AvailableSlotDto>();
 
         foreach (var working in matchingHours)
@@ -76,7 +77,8 @@ public sealed class SchedulingService(ISchedulingRepository repository)
                 var endUtc = new DateTimeOffset(TimeZoneInfo.ConvertTimeToUtc(localSlotEnd, zone), TimeSpan.Zero);
 
                 var occupied = appointments.Any(x => x.Status != AppointmentStatus.Cancelled &&
-                    x.StartsAtUtc < endUtc && x.EndsAtUtc > startUtc);
+                    x.StartsAtUtc < endUtc && x.EndsAtUtc > startUtc) ||
+                    bookingRequests.Any(x => x.StartsAtUtc < endUtc && x.EndsAtUtc > startUtc);
                 if (!occupied && startUtc > DateTimeOffset.UtcNow)
                     result.Add(new AvailableSlotDto(FormatJalaliDate(date), GetDayName(date.DayOfWeek),
                         cursor.ToString("HH:mm"), slotEnd.ToString("HH:mm"), startUtc, endUtc));

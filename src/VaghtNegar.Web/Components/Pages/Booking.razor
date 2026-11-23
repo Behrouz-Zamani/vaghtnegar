@@ -1,0 +1,178 @@
+@page "/book"
+@using System.Globalization
+@using VaghtNegar.Web.Services
+@inject VaghtNegarApiClient ApiClient
+@inject NavigationManager Navigation
+
+<PageTitle>دریافت نوبت | وقت‌نگار</PageTitle>
+
+<section class="page-heading">
+    <span class="eyebrow">نوبت‌دهی آنلاین</span>
+    <h1>انتخاب پزشک و زمان مراجعه</h1>
+    <p class="page-lead">ابتدا زمان مراجعه را انتخاب کنید. این ساعت پس از ثبت درخواست، ۱۰ دقیقه برای شما نگه داشته می‌شود.</p>
+</section>
+
+@if (!string.IsNullOrWhiteSpace(error))
+{
+    <div class="notice-card" role="alert">@error</div>
+}
+@if (!string.IsNullOrWhiteSpace(info))
+{
+    <div class="admin-feedback success" role="status">@info</div>
+}
+
+<section class="panel-card patient-section">
+    @if (loadingDoctors)
+    {
+        <div class="loading-line"><span></span> در حال دریافت فهرست پزشکان...</div>
+    }
+    else
+    {
+        <div class="patient-booking-grid">
+            <label>پزشک
+                <select class="admin-input" @bind="selectedDoctorId">
+                    <option value="">انتخاب پزشک</option>
+                    @foreach (var doctor in doctors.Where(x => x.IsActive))
+                    {
+                        <option value="@doctor.Id">دکتر @doctor.FirstName @doctor.LastName — @doctor.VisitFeeToman.ToString("N0") تومان</option>
+                    }
+                </select>
+            </label>
+            <label>تاریخ مراجعه (شمسی)
+                <input class="admin-input" @bind="jalaliDate" placeholder="۱۴۰۵/۰۹/۰۱" />
+            </label>
+            <label class="patient-note-field">توضیحات (اختیاری)
+                <input class="admin-input" @bind="patientNote" maxlength="1000" placeholder="علت مراجعه یا توضیح کوتاه" />
+            </label>
+        </div>
+        <div class="patient-booking-actions">
+            <button class="btn btn-primary" disabled="@loadingSlots" @onclick="LoadSlotsAsync">نمایش ساعت‌های آزاد</button>
+        </div>
+    }
+    @if (loadingSlots)
+    {
+        <div class="loading-line"><span></span> در حال بررسی ساعت‌ها...</div>
+    }
+    else if (slotsLoaded)
+    {
+        @if (slots.Count == 0)
+        {
+            <div class="empty-inline">برای این تاریخ ساعت آزادی وجود ندارد.</div>
+        }
+        else
+        {
+            <div class="patient-slot-grid">
+                @foreach (var slot in slots)
+                {
+                    <button type="button" class="patient-slot @(selectedSlot == slot ? "selected" : "")"
+                            @onclick="() => selectedSlot = slot">@slot.StartTime</button>
+                }
+            </div>
+        }
+    }
+    @if (selectedSlot is not null)
+    {
+        <div class="patient-confirm-booking">
+            <span>زمان انتخابی: <strong>@selectedSlot.StartTime تا @selectedSlot.EndTime</strong></span>
+            <button class="btn btn-primary" disabled="@creatingHold" @onclick="CreateHoldAsync">
+                @(creatingHold ? "در حال ثبت درخواست..." : "ثبت درخواست و ادامه پرداخت")
+            </button>
+        </div>
+    }
+</section>
+
+@code {
+    private List<AdminDoctorItem> doctors = [];
+    private List<AvailableSlotItem> slots = [];
+    private string? selectedDoctorId;
+    private string jalaliDate = "";
+    private string? patientNote;
+    private AvailableSlotItem? selectedSlot;
+    private bool loadingDoctors = true;
+    private bool loadingSlots;
+    private bool slotsLoaded;
+    private bool creatingHold;
+    private string? error;
+    private string? info;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        jalaliDate = TodayJalali();
+        var result = await ApiClient.GetPublicDoctorsResultAsync();
+        doctors = result.Succeeded && result.Data is not null ? result.Data.Where(x => x.IsActive).ToList() : [];
+        if (!result.Succeeded) error = result.Error ?? "دریافت فهرست پزشکان ناموفق بود.";
+        loadingDoctors = false;
+        StateHasChanged();
+    }
+
+    private async Task LoadSlotsAsync()
+    {
+        error = null;
+        selectedSlot = null;
+        slotsLoaded = false;
+        if (!Guid.TryParse(selectedDoctorId, out var doctorId))
+        {
+            error = "ابتدا پزشک را انتخاب کنید.";
+            return;
+        }
+        var normalized = NormalizeDigits(jalaliDate).Replace('-', '/').Replace('.', '/');
+        try { _ = SchedulingDate(normalized); }
+        catch { error = "تاریخ شمسی معتبر وارد کنید؛ نمونه: ۱۴۰۵/۰۹/۰۱"; return; }
+
+        loadingSlots = true;
+        var result = await ApiClient.GetPublicAvailableSlotsResultAsync(doctorId, normalized);
+        slots = result.Succeeded && result.Data is not null ? result.Data : [];
+        if (!result.Succeeded) error = result.Error ?? "دریافت ساعت‌های آزاد ناموفق بود.";
+        loadingSlots = false;
+        slotsLoaded = true;
+    }
+
+    private async Task CreateHoldAsync()
+    {
+        if (selectedSlot is null || !Guid.TryParse(selectedDoctorId, out var doctorId)) return;
+        creatingHold = true;
+        error = null;
+        var result = await ApiClient.CreateBookingHoldAsync(doctorId, selectedSlot.StartsAtUtc, patientNote);
+        creatingHold = false;
+        if (!result.Succeeded || result.Data is null)
+        {
+            var message = result.Error ?? "ثبت درخواست نوبت ناموفق بود. لطفاً ساعت آزاد دیگری انتخاب کنید.";
+            await LoadSlotsAsync();
+            error = message;
+            return;
+        }
+
+        var returnUrl = "/booking/continue?token=" + Uri.EscapeDataString(result.Data.AccessToken);
+        Navigation.NavigateTo("/account/login?returnUrl=" + Uri.EscapeDataString(returnUrl));
+    }
+
+    private static DateOnly SchedulingDate(string value)
+    {
+        var parts = value.Split('/');
+        if (parts.Length != 3 || !int.TryParse(parts[0], out var y) ||
+            !int.TryParse(parts[1], out var m) || !int.TryParse(parts[2], out var d))
+            throw new FormatException();
+        var calendar = new PersianCalendar();
+        return DateOnly.FromDateTime(calendar.ToDateTime(y, m, d, 0, 0, 0, 0));
+    }
+
+    private static string TodayJalali()
+    {
+        var now = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, TehranZone()).DateTime;
+        var c = new PersianCalendar();
+        return $"{c.GetYear(now):0000}/{c.GetMonth(now):00}/{c.GetDayOfMonth(now):00}";
+    }
+
+    private static TimeZoneInfo TehranZone()
+    {
+        try { return TimeZoneInfo.FindSystemTimeZoneById("Asia/Tehran"); }
+        catch (TimeZoneNotFoundException) { return TimeZoneInfo.FindSystemTimeZoneById("Iran Standard Time"); }
+    }
+
+    private static string NormalizeDigits(string value) => value
+        .Replace("۰","0").Replace("۱","1").Replace("۲","2").Replace("۳","3").Replace("۴","4")
+        .Replace("۵","5").Replace("۶","6").Replace("۷","7").Replace("۸","8").Replace("۹","9")
+        .Replace("٠","0").Replace("١","1").Replace("٢","2").Replace("٣","3").Replace("٤","4")
+        .Replace("٥","5").Replace("٦","6").Replace("٧","7").Replace("٨","8").Replace("٩","9");
+}

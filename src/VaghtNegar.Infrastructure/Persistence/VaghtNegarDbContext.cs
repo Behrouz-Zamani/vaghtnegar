@@ -9,6 +9,7 @@ public sealed class VaghtNegarDbContext(DbContextOptions<VaghtNegarDbContext> op
     public DbSet<Doctor> Doctors => Set<Doctor>();
     public DbSet<Patient> Patients => Set<Patient>();
     public DbSet<Appointment> Appointments => Set<Appointment>();
+    public DbSet<AppointmentBookingRequest> AppointmentBookingRequests => Set<AppointmentBookingRequest>();
     public DbSet<DoctorWorkingHour> DoctorWorkingHours => Set<DoctorWorkingHour>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -59,6 +60,23 @@ public sealed class VaghtNegarDbContext(DbContextOptions<VaghtNegarDbContext> op
             entity.Property(x => x.PatientNote).HasMaxLength(1000);
             entity.HasIndex(x => new { x.DoctorId, x.StartsAtUtc });
             entity.HasIndex(x => new { x.ClinicId, x.StartsAtUtc });
+        });
+
+        modelBuilder.Entity<AppointmentBookingRequest>(entity =>
+        {
+            entity.ToTable("AppointmentBookingRequests");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.IdentityUserId).HasMaxLength(128);
+            entity.Property(x => x.AccessTokenHash).HasMaxLength(128).IsRequired();
+            entity.Property(x => x.Status).HasConversion<int>();
+            entity.Property(x => x.PatientNote).HasMaxLength(1000);
+            entity.Property(x => x.ReceiptContentType).HasMaxLength(100);
+            entity.Property(x => x.ReceiptFileName).HasMaxLength(180);
+            entity.Property(x => x.AdminNote).HasMaxLength(1000);
+            entity.Property(x => x.ReviewedByIdentityUserId).HasMaxLength(128);
+            entity.HasIndex(x => x.AccessTokenHash).IsUnique();
+            entity.HasIndex(x => new { x.DoctorId, x.StartsAtUtc, x.Status });
+            entity.HasIndex(x => new { x.PatientId, x.CreatedAtUtc });
         });
 
         modelBuilder.Entity<DoctorWorkingHour>(entity =>

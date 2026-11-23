@@ -1,0 +1,173 @@
+@page "/admin/payments"
+@attribute [Authorize(Roles = "ClinicAdmin,SuperAdmin")]
+@using VaghtNegar.Web.Services
+@inject VaghtNegarApiClient ApiClient
+
+<PageTitle>بررسی پرداخت‌ها | وقت‌نگار</PageTitle>
+
+<section class="page-heading">
+    <span class="eyebrow">مدیریت مالی</span>
+    <h1>بررسی رسیدهای پرداخت</h1>
+    <p class="page-lead">با تأیید رسید، نوبت قطعی می‌شود؛ با رد رسید، زمان انتخابی آزاد خواهد شد.</p>
+</section>
+
+@if (!string.IsNullOrWhiteSpace(feedback))
+{
+    <div class="admin-feedback @(isError ? "error" : "success")" role="status">@feedback</div>
+}
+<section class="panel-card admin-section">
+    <div class="panel-heading">
+        <div><span class="eyebrow">در انتظار بررسی</span><h2>رسیدهای کارت‌به‌کارت</h2></div>
+        <button class="btn btn-outline" disabled="@loading" @onclick="LoadAsync">بازخوانی</button>
+    </div>
+    @if (loading)
+    {
+        <div class="loading-line"><span></span> در حال دریافت درخواست‌ها...</div>
+    }
+    else if (error is not null)
+    {
+        <div class="notice-card" role="alert">@error</div>
+    }
+    else if (requests.Count == 0)
+    {
+        <div class="empty-inline">در حال حاضر رسیدی برای بررسی وجود ندارد.</div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>بیمار</th><th>موبایل</th><th>پزشک</th><th>زمان نوبت</th><th>مبلغ (تومان)</th><th>زمان ارسال رسید</th><th>رسید</th><th>عملیات</th></tr></thead>
+                <tbody>
+                    @foreach (var item in requests)
+                    {
+                        <tr>
+                            <td>@item.PatientFullName</td>
+                            <td dir="ltr">@item.PatientMobileNumber</td>
+                            <td>دکتر @item.DoctorFullName</td>
+                            <td>@item.StartsAtUtc.ToLocalTime().ToString("yyyy/MM/dd HH:mm")</td>
+                            <td>@item.VisitFeeToman.ToString("N0")</td>
+                            <td>@item.ReceiptSubmittedAtUtc?.ToLocalTime().ToString("HH:mm - yyyy/MM/dd")</td>
+                            <td>تصویر ثبت‌شده</td>
+                            <td class="admin-actions">
+                                <button class="btn btn-outline btn-small" disabled="@busy" @onclick="() => ViewReceiptAsync(item)">بررسی رسید</button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>
+
+@if (selectedRequest is not null)
+{
+    <section class="panel-card admin-section">
+        <div class="panel-heading"><div><span class="eyebrow">رسید انتخاب‌شده</span><h2>دکتر @selectedRequest.DoctorFullName</h2></div></div>
+        @if (receiptLoading)
+        {
+            <div class="loading-line"><span></span> در حال دریافت تصویر رسید...</div>
+        }
+        else if (selectedReceipt is not null)
+        {
+            <img style="max-width:100%;max-height:640px;object-fit:contain;border-radius:12px"
+                 src="@($"data:{selectedReceipt.ContentType};base64,{selectedReceipt.Base64Content}")"
+                 alt="تصویر رسید پرداخت" />
+        }
+        <label>علت رد (در صورت رد رسید)
+            <textarea class="admin-input" @bind="rejectReason" maxlength="1000" rows="3" placeholder="علت رد رسید را وارد کنید"></textarea>
+        </label>
+        <div class="admin-form-actions">
+            <button class="btn btn-primary" disabled="@busy" @onclick="() => ApproveAsync(selectedRequest)">تأیید و قطعی‌کردن نوبت</button>
+            <button class="btn btn-danger-soft" disabled="@busy" @onclick="() => RejectAsync(selectedRequest)">رد رسید و آزادسازی ساعت</button>
+            <button class="btn btn-outline" @onclick="ClearSelection">بستن</button>
+        </div>
+    </section>
+}
+
+@code {
+    private List<BookingRequestDto> requests = [];
+    private BookingRequestDto? selectedRequest;
+    private ReceiptImageDto? selectedReceipt;
+    private string rejectReason = "";
+    private bool loading = true;
+    private bool receiptLoading;
+    private bool busy;
+    private bool isError;
+    private string? error;
+    private string? feedback;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        await LoadAsync();
+        StateHasChanged();
+    }
+
+    private async Task LoadAsync()
+    {
+        loading = true;
+        error = null;
+        var result = await ApiClient.GetPendingBookingReviewsAsync();
+        if (result.Succeeded && result.Data is not null)
+            requests = result.Data.Items.ToList();
+        else
+            error = result.Error ?? "دریافت رسیدهای در انتظار بررسی ناموفق بود.";
+        loading = false;
+    }
+
+    private async Task ViewReceiptAsync(BookingRequestDto item)
+    {
+        selectedRequest = item;
+        selectedReceipt = null;
+        receiptLoading = true;
+        var result = await ApiClient.GetBookingReceiptAsync(item.Id);
+        if (result.Succeeded) selectedReceipt = result.Data;
+        else ShowFeedback(result.Error ?? "دریافت تصویر رسید ناموفق بود.", true);
+        receiptLoading = false;
+    }
+
+    private async Task ApproveAsync(BookingRequestDto item)
+    {
+        busy = true;
+        var result = await ApiClient.ApproveBookingPaymentAsync(item.Id);
+        busy = false;
+        ShowFeedback(result.Message, !result.Succeeded);
+        if (result.Succeeded)
+        {
+            ClearSelection();
+            await LoadAsync();
+        }
+    }
+
+    private async Task RejectAsync(BookingRequestDto item)
+    {
+        if (string.IsNullOrWhiteSpace(rejectReason))
+        {
+            ShowFeedback("برای رد رسید، علت رد را وارد کنید.", true);
+            return;
+        }
+        busy = true;
+        var result = await ApiClient.RejectBookingPaymentAsync(item.Id, rejectReason.Trim());
+        busy = false;
+        ShowFeedback(result.Message, !result.Succeeded);
+        if (result.Succeeded)
+        {
+            rejectReason = "";
+            ClearSelection();
+            await LoadAsync();
+        }
+    }
+
+    private void ClearSelection()
+    {
+        selectedRequest = null;
+        selectedReceipt = null;
+        rejectReason = "";
+    }
+
+    private void ShowFeedback(string message, bool errorState)
+    {
+        feedback = message;
+        isError = errorState;
+    }
+}
