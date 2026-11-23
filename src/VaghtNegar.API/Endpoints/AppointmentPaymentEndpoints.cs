@@ -77,14 +77,15 @@ public static class AppointmentPaymentEndpoints
             Guid id, ReceiptRequest request, ClaimsPrincipal user, VaghtNegarDbContext db, CancellationToken ct) =>
         {
             var subject = user.FindFirst("sub")?.Value;
+            var patientId = await db.Patients.Where(p => p.IdentityUserId == subject && p.IsActive)
+                .Select(p => (Guid?)p.Id).FirstOrDefaultAsync(ct);
+            if (patientId is null) return Results.NotFound(new { message = "پرونده بیمار یافت نشد." });
             var payment = await db.AppointmentPayments.Include(x => x.Appointment)
-                .Join(db.Patients.Where(p => p.IdentityUserId == subject && p.IsActive),
-                    p => p.PatientId, patientRecord => patientRecord.Id, (p, _) => p)
-                .FirstOrDefaultAsync(x => x.Id == id, ct);
+                .FirstOrDefaultAsync(x => x.Id == id && x.PatientId == patientId, ct);
             if (payment is null) return Results.NotFound(new { message = "درخواست پرداخت یافت نشد." });
             if (payment.ExpireIfDue(DateTimeOffset.UtcNow))
             {
-                if (payment.Appointment.Status == AppointmentStatus.Pending) payment.Appointment.Cancel();
+                if (payment.Appointment.Status == AppointmentStatus.Pending) payment.Appointment.ReleasePaymentHold();
                 await db.SaveChangesAsync(ct);
                 return Results.Conflict(new { message = "مهلت پرداخت تمام شده است؛ زمان نوبت آزاد شد." });
             }
