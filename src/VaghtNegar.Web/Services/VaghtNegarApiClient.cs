@@ -466,6 +466,6 @@ public sealed record CreateBookingHoldRequest(DateTimeOffset StartsAtUtc, string
 public sealed record SubmitPaymentReceiptRequest(string FileName, string ContentType, string Base64Content);
 public sealed record RejectBookingPaymentRequest(string Reason);
 public sealed record BookingHoldCreatedDto(Guid RequestId, string AccessToken, DateTimeOffset HoldExpiresAtUtc, long VisitFeeToman, DateTimeOffset StartsAtUtc, DateTimeOffset EndsAtUtc, string Status);
-public sealed record BookingRequestDto(Guid Id, Guid DoctorId, string DoctorFullName, DateTimeOffset StartsAtUtc, DateTimeOffset EndsAtUtc, long VisitFeeToman, string Status, DateTimeOffset HoldExpiresAtUtc, DateTimeOffset CreatedAtUtc, DateTimeOffset? ReceiptSubmittedAtUtc, string? AdminNote, bool HasReceipt);
+public sealed record BookingRequestDto(Guid Id, Guid DoctorId, string DoctorFullName, string PatientFullName, string PatientMobileNumber, DateTimeOffset StartsAtUtc, DateTimeOffset EndsAtUtc, long VisitFeeToman, string Status, DateTimeOffset HoldExpiresAtUtc, DateTimeOffset CreatedAtUtc, DateTimeOffset? ReceiptSubmittedAtUtc, string? AdminNote, bool HasReceipt);
 public sealed record BookingRequestsPageDto(IReadOnlyList<BookingRequestDto> Items, int Page, int PageSize, int TotalCount, int TotalPages);
 public sealed record ReceiptImageDto(string ContentType, string FileName, string Base64Content);
