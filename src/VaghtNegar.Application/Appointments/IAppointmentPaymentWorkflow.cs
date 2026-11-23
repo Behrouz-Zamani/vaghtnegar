@@ -23,6 +23,8 @@ public interface IAppointmentPaymentWorkflow
     Task<BookingRequestDto> ClaimAsync(string token, string identityUserId, CancellationToken ct);
     Task<BookingRequestDto> SubmitReceiptAsync(string token, string identityUserId, SubmitPaymentReceiptRequest request, CancellationToken ct);
     Task<BookingRequestsPageDto> GetMyRequestsAsync(string identityUserId, int page, int pageSize, CancellationToken ct);
+    Task<BookingRequestDto?> GetMyRequestAsync(Guid requestId, string identityUserId, CancellationToken ct);
+    Task<BookingRequestDto> SubmitMyReceiptAsync(Guid requestId, string identityUserId, SubmitPaymentReceiptRequest request, CancellationToken ct);
     Task<BookingRequestsPageDto> GetPendingReviewAsync(int page, int pageSize, CancellationToken ct);
     Task<BookingRequestDto> ApproveAsync(Guid requestId, string reviewerIdentityUserId, CancellationToken ct);
     Task<BookingRequestDto> RejectAsync(Guid requestId, string reviewerIdentityUserId, string reason, CancellationToken ct);
