@@ -108,6 +108,39 @@ else
 
     <section class="panel-card patient-section">
         <div class="panel-heading">
+            <div><span class="eyebrow">امور مالی</span><h2>درخواست‌ها و پرداخت‌های من</h2></div>
+            <button class="btn btn-outline" @onclick="LoadPaymentsAsync">بازخوانی</button>
+        </div>
+        @if (myPayments.Count == 0)
+        {
+            <div class="empty-inline">درخواست پرداختی ثبت نشده است.</div>
+        }
+        else
+        {
+            <div class="patient-appointments">
+                @foreach (var payment in myPayments)
+                {
+                    <article class="patient-appointment">
+                        <div class="patient-appointment-date">
+                            <strong>@FormatJalali(payment.StartsAtUtc)</strong>
+                            <span>@FormatTehran(payment.StartsAtUtc)</span>
+                        </div>
+                        <div class="patient-appointment-main">
+                            <strong>@payment.AmountToman.ToString("N0") تومان</strong>
+                            <span>@PaymentStatusText(payment.Status)</span>
+                            @if (!string.IsNullOrWhiteSpace(payment.ReviewNote))
+                            {
+                                <small>توضیح مدیر: @payment.ReviewNote</small>
+                            }
+                        </div>
+                    </article>
+                }
+            </div>
+        }
+    </section>
+
+    <section class="panel-card patient-section">
+        <div class="panel-heading">
             <div><span class="eyebrow">نوبت‌دهی آنلاین</span><h2>دریافت نوبت جدید</h2></div>
         </div>
         @if (doctorsError is not null)
@@ -206,6 +239,7 @@ else
 @code {
     private PatientProfileDto? profile;
     private PatientAppointmentsPageDto appointments = new([], 1, 20, 0, 0);
+    private List<MyAppointmentPaymentDto> myPayments = [];
     private List<AdminDoctorItem> doctors = [];
     private List<AvailableSlotItem> availableSlots = [];
     private string? selectedDoctorId;
@@ -257,6 +291,7 @@ else
         {
             jalaliDate = TodayJalali();
             await LoadAppointmentsAsync();
+            await LoadPaymentsAsync();
             await LoadDoctorsAsync();
         }
         loading = false;
@@ -286,6 +321,23 @@ else
             appointmentsError = result.Error ?? "دریافت نوبت‌های شما ناموفق بود.";
         appointmentsLoading = false;
     }
+
+    private async Task LoadPaymentsAsync()
+    {
+        var result = await ApiClient.GetMyAppointmentPaymentsAsync();
+        if (result.Succeeded && result.Data is not null)
+            myPayments = result.Data;
+    }
+
+    private static string PaymentStatusText(string status) => status switch
+    {
+        "AwaitingReceipt" => "در انتظار واریز و ارسال رسید",
+        "ReceiptSubmitted" => "رسید ارسال شده؛ در انتظار بررسی مدیر",
+        "Approved" => "پرداخت تأیید شد؛ نوبت قطعی است",
+        "Rejected" => "رسید رد شد؛ زمان نوبت آزاد شده است",
+        "Expired" => "مهلت پرداخت تمام شد؛ زمان نوبت آزاد شده است",
+        _ => status
+    };
 
     private async Task ChangePageAsync(int page)
     {
@@ -398,7 +450,11 @@ else
         var result = await ApiClient.SubmitAppointmentReceiptAsync(checkout.Id, receiptReference, receiptContentType, receiptImageBase64);
         submittingReceipt = false;
         ShowFeedback(result.Message, !result.Succeeded);
-        if (result.Succeeded) checkout = null;
+        if (result.Succeeded)
+        {
+            checkout = null;
+            await LoadPaymentsAsync();
+        }
     }
 
     private bool CanCancel(PatientAppointmentDto item) =>
