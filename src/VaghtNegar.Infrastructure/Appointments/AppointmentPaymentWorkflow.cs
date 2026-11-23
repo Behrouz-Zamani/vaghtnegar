@@ -79,8 +79,10 @@ public sealed class AppointmentPaymentWorkflow(
 
     public async Task<BookingRequestDto> ClaimAsync(string token, string identityUserId, CancellationToken ct)
     {
+        var initial = await FindByTokenAsync(token, ct);
         await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
-        var booking = await FindByTokenAsync(token, ct);
+        var booking = await db.AppointmentBookingRequests.FirstOrDefaultAsync(x => x.Id == initial.Id, ct)
+            ?? throw new KeyNotFoundException("درخواست نوبت یافت نشد.");
         if (booking.IdentityUserId == identityUserId && booking.PatientId.HasValue)
             return await MapAsync(booking.Id, ct);
         if (!string.IsNullOrWhiteSpace(booking.IdentityUserId) &&
