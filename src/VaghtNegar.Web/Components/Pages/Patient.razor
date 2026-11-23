@@ -135,6 +135,10 @@ else
                         <div class="patient-appointment-main">
                             <strong>دکتر @request.DoctorFullName</strong>
                             <span>حق‌ویزیت: @request.VisitFeeToman.ToString("N0") تومان</span>
+                            @if (!string.IsNullOrWhiteSpace(request.AdminNote))
+                            {
+                                <small>توضیح مدیریت: @request.AdminNote</small>
+                            }
                         </div>
                         <div class="patient-appointment-actions">
                             <span class="soft-status">@BookingStatusText(request.Status)</span>
