@@ -32,6 +32,7 @@ public static class DependencyInjection
         services.AddScoped<IAppointmentBookingRepository, AppointmentBookingRepository>();
         services.AddScoped<IAppointmentManagementRepository, AppointmentManagementRepository>();
         services.AddScoped<IPatientPortalRepository, PatientPortalRepository>();
+        services.AddScoped<IAppointmentPaymentWorkflow, AppointmentPaymentWorkflow>();
         return services;
     }
 }
