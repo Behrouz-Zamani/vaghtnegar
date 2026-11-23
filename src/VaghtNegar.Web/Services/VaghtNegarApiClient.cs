@@ -29,6 +29,46 @@ public sealed class VaghtNegarApiClient(IJSRuntime jsRuntime)
     public Task<ApiReadResult<List<AdminDoctorItem>>> GetDoctorsResultAsync(CancellationToken ct = default) =>
         TryGetCollectionResultAsync<AdminDoctorItem>("bff/api/v1/doctors", ct);
 
+    public Task<ApiReadResult<List<AdminDoctorItem>>> GetPublicDoctorsResultAsync(CancellationToken ct = default) =>
+        TryGetCollectionResultAsync<AdminDoctorItem>("public-bff/api/v1/doctors", ct);
+
+    public Task<ApiReadResult<List<AvailableSlotItem>>> GetPublicAvailableSlotsResultAsync(
+        Guid doctorId, string jalaliDate, CancellationToken ct = default) =>
+        TryGetCollectionResultAsync<AvailableSlotItem>(
+            $"public-bff/api/v1/doctors/{doctorId}/schedule/available-slots?date={Uri.EscapeDataString(jalaliDate)}", ct);
+
+    public Task<ApiReadResult<BookingHoldCreatedDto>> CreateBookingHoldAsync(
+        Guid doctorId, DateTimeOffset startsAtUtc, string? patientNote, CancellationToken ct = default) =>
+        RequestItemResultAsync<BookingHoldCreatedDto>("POST", $"public-bff/api/v1/booking-requests/{doctorId}",
+            new CreateBookingHoldRequest(startsAtUtc, patientNote), ct);
+
+    public Task<ApiReadResult<BookingRequestDto>> GetBookingHoldAsync(string token, CancellationToken ct = default) =>
+        RequestItemResultAsync<BookingRequestDto>("GET", $"public-bff/api/v1/booking-requests/{Uri.EscapeDataString(token)}", null, ct);
+
+    public Task<ApiReadResult<BookingRequestDto>> ClaimBookingHoldAsync(string token, CancellationToken ct = default) =>
+        RequestItemResultAsync<BookingRequestDto>("POST", $"bff/api/v1/booking-requests/{Uri.EscapeDataString(token)}/claim",
+            new Dictionary<string, object>(), ct);
+
+    public Task<AdminMutationResult> SubmitBookingReceiptAsync(
+        string token, string fileName, string contentType, string base64Content, CancellationToken ct = default) =>
+        SendAsync("POST", $"bff/api/v1/booking-requests/{Uri.EscapeDataString(token)}/receipt",
+            new SubmitPaymentReceiptRequest(fileName, contentType, base64Content), ct);
+
+    public Task<ApiReadResult<BookingRequestsPageDto>> GetMyBookingRequestsAsync(int page = 1, CancellationToken ct = default) =>
+        RequestItemResultAsync<BookingRequestsPageDto>("GET", $"bff/api/v1/booking-requests/me?page={page}&pageSize=20", null, ct);
+
+    public Task<ApiReadResult<BookingRequestsPageDto>> GetPendingBookingReviewsAsync(int page = 1, CancellationToken ct = default) =>
+        RequestItemResultAsync<BookingRequestsPageDto>("GET", $"bff/api/v1/admin/booking-requests/pending-review?page={page}&pageSize=20", null, ct);
+
+    public Task<ApiReadResult<ReceiptImageDto>> GetBookingReceiptAsync(Guid requestId, CancellationToken ct = default) =>
+        RequestItemResultAsync<ReceiptImageDto>("GET", $"bff/api/v1/admin/booking-requests/{requestId}/receipt", null, ct);
+
+    public Task<AdminMutationResult> ApproveBookingPaymentAsync(Guid requestId, CancellationToken ct = default) =>
+        SendAsync("POST", $"bff/api/v1/admin/booking-requests/{requestId}/approve", new Dictionary<string, object>(), ct);
+
+    public Task<AdminMutationResult> RejectBookingPaymentAsync(Guid requestId, string reason, CancellationToken ct = default) =>
+        SendAsync("POST", $"bff/api/v1/admin/booking-requests/{requestId}/reject", new RejectBookingPaymentRequest(reason), ct);
+
     public Task<AdminMutationResult> CreateClinicAsync(string name, string slug, CancellationToken ct = default) =>
         SendAsync("POST", "bff/api/v1/clinics/", new { name, slug }, ct);
 
@@ -192,6 +232,32 @@ public sealed class VaghtNegarApiClient(IJSRuntime jsRuntime)
         // Send an explicit empty JSON object so the BFF forwards a PATCH body
         // consistently across browsers and hosting environments.
         return SendAsync("PATCH", $"bff/api/v1/appointments/{id}/{action}", new Dictionary<string, object>(), ct);
+    }
+
+    private async Task<ApiReadResult<T>> RequestItemResultAsync<T>(
+        string method, string path, object? body, CancellationToken ct) where T : class
+    {
+        try
+        {
+            var response = method.Equals("GET", StringComparison.OrdinalIgnoreCase)
+                ? await GetAsync(path, ct)
+                : await jsRuntime.InvokeAsync<BrowserApiResponse>(
+                    "vaghtNegarApi.request", ct, method, path, JsonSerializer.Serialize(body ?? new Dictionary<string, object>(), JsonOptions));
+            if (response.Status is < 200 or >= 300)
+                return new ApiReadResult<T>(false, null, ReadError(response.Body, response.Status));
+            var data = JsonSerializer.Deserialize<T>(response.Body, JsonOptions);
+            return data is null
+                ? new ApiReadResult<T>(false, null, "پاسخ دریافتی از سرور خالی است.")
+                : new ApiReadResult<T>(true, data, null);
+        }
+        catch (JSException)
+        {
+            return new ApiReadResult<T>(false, null, "ارتباط با سرور برقرار نشد. اتصال API را بررسی کنید.");
+        }
+        catch (JsonException)
+        {
+            return new ApiReadResult<T>(false, null, "پاسخ دریافتی از سرور قابل پردازش نیست.");
+        }
     }
 
     private async Task<ApiReadResult<T>> TryGetItemResultAsync<T>(
@@ -387,3 +453,11 @@ public sealed record WorkingHourInputItem(int DayOfWeek, string StartTime, strin
 public sealed record PatientProfileDto(Guid Id, string FirstName, string LastName, string MobileNumber, DateOnly? BirthDate);
 public sealed record PatientAppointmentDto(Guid Id, Guid ClinicId, Guid DoctorId, string DoctorFullName, DateTimeOffset StartsAtUtc, DateTimeOffset EndsAtUtc, string Status, string? PatientNote, DateTimeOffset CreatedAtUtc);
 public sealed record PatientAppointmentsPageDto(IReadOnlyList<PatientAppointmentDto> Items, int Page, int PageSize, int TotalCount, int TotalPages);
+
+public sealed record CreateBookingHoldRequest(DateTimeOffset StartsAtUtc, string? PatientNote);
+public sealed record SubmitPaymentReceiptRequest(string FileName, string ContentType, string Base64Content);
+public sealed record RejectBookingPaymentRequest(string Reason);
+public sealed record BookingHoldCreatedDto(Guid RequestId, string AccessToken, DateTimeOffset HoldExpiresAtUtc, long VisitFeeToman, DateTimeOffset StartsAtUtc, DateTimeOffset EndsAtUtc, string Status);
+public sealed record BookingRequestDto(Guid Id, Guid DoctorId, string DoctorFullName, DateTimeOffset StartsAtUtc, DateTimeOffset EndsAtUtc, long VisitFeeToman, string Status, DateTimeOffset HoldExpiresAtUtc, DateTimeOffset CreatedAtUtc, DateTimeOffset? ReceiptSubmittedAtUtc, string? AdminNote, bool HasReceipt);
+public sealed record BookingRequestsPageDto(IReadOnlyList<BookingRequestDto> Items, int Page, int PageSize, int TotalCount, int TotalPages);
+public sealed record ReceiptImageDto(string ContentType, string FileName, string Base64Content);
