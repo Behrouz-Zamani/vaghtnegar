@@ -9,6 +9,9 @@
     <span class="eyebrow">مدیریت پرونده‌ها</span>
     <h1>مدیریت بیماران</h1>
     <p class="page-lead">ثبت و ویرایش پرونده، جست‌وجوی بیمار و اتصال حساب Keycloak پس از احراز شماره موبایل.</p>
+    <div class="notice-card">
+        پس از اتصال شناسه sub، نقش Realm با نام <strong>Patient</strong> نیز باید برای همان کاربر در Keycloak فعال باشد؛ این صفحه نقش‌های Keycloak را تغییر نمی‌دهد.
+    </div>
 </section>
 
 @if (!string.IsNullOrWhiteSpace(feedback))
