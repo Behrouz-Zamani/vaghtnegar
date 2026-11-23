@@ -54,7 +54,7 @@
                     <input class="admin-input" @bind="mobileNumber" maxlength="30" inputmode="tel" dir="ltr" />
                 </label>
                 <label>تاریخ تولد (اختیاری)
-                    <input class="admin-input" type="date" @bind="birthDateText" dir="ltr" />
+                    <input class="admin-input" type="date" @bind="birthDateValue" dir="ltr" />
                 </label>
             </div>
             <div class="admin-form-actions">
@@ -173,7 +173,7 @@
     private string firstName = "";
     private string lastName = "";
     private string mobileNumber = "";
-    private string birthDateText = "";
+    private DateTime? birthDateValue;
     private string identityUserId = "";
     private bool mobileNumberVerified;
 
@@ -215,7 +215,7 @@
         firstName = "";
         lastName = "";
         mobileNumber = "";
-        birthDateText = "";
+        birthDateValue = null;
         editorOpen = true;
         linkingPatientId = null;
         feedback = null;
@@ -227,7 +227,7 @@
         firstName = patient.FirstName;
         lastName = patient.LastName;
         mobileNumber = patient.MobileNumber;
-        birthDateText = patient.BirthDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "";
+        birthDateValue = patient.BirthDate?.ToDateTime(TimeOnly.MinValue);
         editorOpen = true;
         linkingPatientId = null;
         feedback = null;
@@ -244,17 +244,9 @@
             return;
         }
 
-        DateOnly? birthDate = null;
-        if (!string.IsNullOrWhiteSpace(birthDateText))
-        {
-            if (!DateOnly.TryParseExact(birthDateText, "yyyy-MM-dd", CultureInfo.InvariantCulture,
-                    DateTimeStyles.None, out var parsedDate))
-            {
-                ShowFeedback("تاریخ تولد معتبر نیست.", true);
-                return;
-            }
-            birthDate = parsedDate;
-        }
+        DateOnly? birthDate = birthDateValue.HasValue
+            ? DateOnly.FromDateTime(birthDateValue.Value)
+            : null;
 
         saving = true;
         var result = editingPatientId is Guid id
