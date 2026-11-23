@@ -7,5 +7,6 @@ public sealed record PatientDto(
     string MobileNumber,
     DateOnly? BirthDate,
     bool IsActive,
+    bool HasLinkedIdentity,
     DateTimeOffset CreatedAtUtc,
     DateTimeOffset? UpdatedAtUtc);
