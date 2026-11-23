@@ -133,7 +133,7 @@ public static class AppointmentPaymentEndpoints
             if (payment is null) return Results.NotFound(new { message = "پرداخت یافت نشد." });
             if (payment.ExpireIfDue(DateTimeOffset.UtcNow))
             {
-                if (payment.Appointment.Status == AppointmentStatus.Pending) payment.Appointment.Cancel();
+                if (payment.Appointment.Status == AppointmentStatus.Pending) payment.Appointment.ReleasePaymentHold();
                 await db.SaveChangesAsync(ct);
                 return Results.Conflict(new { message = "مهلت پرداخت تمام شده و نوبت آزاد شده است." });
             }
@@ -155,14 +155,14 @@ public static class AppointmentPaymentEndpoints
             if (payment is null) return Results.NotFound(new { message = "پرداخت یافت نشد." });
             if (payment.ExpireIfDue(DateTimeOffset.UtcNow))
             {
-                if (payment.Appointment.Status == AppointmentStatus.Pending) payment.Appointment.Cancel();
+                if (payment.Appointment.Status == AppointmentStatus.Pending) payment.Appointment.ReleasePaymentHold();
                 await db.SaveChangesAsync(ct);
                 return Results.Conflict(new { message = "مهلت پرداخت تمام شده و نوبت آزاد شده است." });
             }
             try
             {
                 payment.Reject(user.FindFirst("preferred_username")?.Value ?? user.FindFirst("sub")?.Value ?? "staff", request.Reason);
-                if (payment.Appointment.Status == AppointmentStatus.Pending) payment.Appointment.Cancel();
+                if (payment.Appointment.Status == AppointmentStatus.Pending) payment.Appointment.ReleasePaymentHold();
                 await db.SaveChangesAsync(ct);
                 return Results.Ok(new { payment.Id, status = payment.Status.ToString(), payment.ReviewNote });
             }
@@ -184,7 +184,7 @@ public static class AppointmentPaymentEndpoints
         {
             if (payment.ExpireIfDue(DateTimeOffset.UtcNow) &&
                 payment.Appointment.Status == AppointmentStatus.Pending)
-                payment.Appointment.Cancel();
+                payment.Appointment.ReleasePaymentHold();
         }
         if (due.Count > 0) await db.SaveChangesAsync(ct);
     }
