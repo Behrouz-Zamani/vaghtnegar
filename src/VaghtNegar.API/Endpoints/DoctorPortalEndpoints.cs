@@ -22,6 +22,16 @@ public static class DoctorPortalEndpoints
                 : Results.Ok(doctor);
         }).WithName("GetMyDoctorProfile");
 
+        group.MapPut("/visit-fee", async (ClaimsPrincipal user, UpdateMyVisitFeeRequest request, DoctorService doctors, CancellationToken ct) =>
+        {
+            var subject = user.FindFirst("sub")?.Value;
+            if (string.IsNullOrWhiteSpace(subject)) return Results.Unauthorized();
+            if (request.VisitFeeToman <= 0)
+                return Results.ValidationProblem(new Dictionary<string, string[]> { ["visitFeeToman"] = ["حق ویزیت باید بیشتر از صفر باشد."] });
+            var doctor = await doctors.UpdateMyVisitFeeAsync(subject, request.VisitFeeToman, ct);
+            return doctor is null ? Results.NotFound(new { message = "پرونده پزشک به این حساب متصل نیست." }) : Results.Ok(doctor);
+        }).WithName("UpdateMyDoctorVisitFee");
+
         group.MapGet("/schedule/working-hours", async (
             ClaimsPrincipal user, DoctorService doctors, SchedulingService scheduling, CancellationToken ct) =>
         {
@@ -74,3 +84,5 @@ public static class DoctorPortalEndpoints
             : doctors.GetByIdentityUserIdAsync(subject, ct);
     }
 }
+
+public sealed record UpdateMyVisitFeeRequest(long VisitFeeToman);
