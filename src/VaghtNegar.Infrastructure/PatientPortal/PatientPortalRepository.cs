@@ -94,6 +94,8 @@ public sealed class PatientPortalRepository(VaghtNegarDbContext db) : IPatientPo
         }
 
         appointment.Cancel();
+        var payment = await db.AppointmentPayments.FirstOrDefaultAsync(x => x.AppointmentId == appointmentId, cancellationToken);
+        payment?.CancelBeforeApproval("patient");
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
 
