@@ -176,8 +176,7 @@ public static class AppointmentPaymentEndpoints
     public static async Task ExpireDueAsync(VaghtNegarDbContext db, CancellationToken ct)
     {
         var due = await db.AppointmentPayments.Include(x => x.Appointment)
-            .Where(x => (x.Status == AppointmentPaymentStatus.AwaitingReceipt ||
-                         x.Status == AppointmentPaymentStatus.ReceiptSubmitted) &&
+            .Where(x => x.Status == AppointmentPaymentStatus.AwaitingReceipt &&
                         x.ExpiresAtUtc <= DateTimeOffset.UtcNow)
             .ToListAsync(ct);
         foreach (var payment in due)
