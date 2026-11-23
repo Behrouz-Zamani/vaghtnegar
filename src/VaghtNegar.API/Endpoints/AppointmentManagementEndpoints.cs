@@ -92,6 +92,12 @@ public static class AppointmentManagementEndpoints
                         return Results.Conflict(new { message = "این نوبت آنلاین است و تا تأیید رسید پرداخت، امکان قطعی‌کردن آن وجود ندارد." });
                 }
                 var result = await service.ChangeStatusAsync(id, action, cancellationToken);
+                if (action == "cancel")
+                {
+                    var payment = await db.AppointmentPayments.FirstOrDefaultAsync(x => x.AppointmentId == id, cancellationToken);
+                    payment?.CancelBeforeApproval("staff");
+                    if (payment is not null) await db.SaveChangesAsync(cancellationToken);
+                }
                 return Results.Ok(result);
             }
             catch (AppointmentForManagementNotFoundException ex)
