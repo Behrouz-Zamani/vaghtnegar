@@ -47,7 +47,7 @@
                             <td>@item.StartsAtUtc.ToLocalTime().ToString("yyyy/MM/dd HH:mm")</td>
                             <td>@item.VisitFeeToman.ToString("N0")</td>
                             <td>@item.ReceiptSubmittedAtUtc?.ToLocalTime().ToString("HH:mm - yyyy/MM/dd")</td>
-                            <td><button class="btn btn-outline btn-small" disabled="@busy" @onclick="() => ViewReceiptAsync(item)">مشاهده</button></td>
+                            <td>تصویر ثبت‌شده</td>
                             <td class="admin-actions">
                                 <button class="btn btn-outline btn-small" disabled="@busy" @onclick="() => ViewReceiptAsync(item)">بررسی رسید</button>
                             </td>
