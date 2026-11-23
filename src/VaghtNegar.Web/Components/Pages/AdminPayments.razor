@@ -49,8 +49,7 @@
                             <td>@item.ReceiptSubmittedAtUtc?.ToLocalTime().ToString("HH:mm - yyyy/MM/dd")</td>
                             <td><button class="btn btn-outline btn-small" disabled="@busy" @onclick="() => ViewReceiptAsync(item)">مشاهده</button></td>
                             <td class="admin-actions">
-                                <button class="btn btn-primary btn-small" disabled="@busy" @onclick="() => ApproveAsync(item)">تأیید و قطعی‌کردن</button>
-                                <button class="btn btn-danger-soft btn-small" disabled="@busy" @onclick="() => RejectAsync(item)">رد رسید</button>
+                                <button class="btn btn-outline btn-small" disabled="@busy" @onclick="() => ViewReceiptAsync(item)">بررسی رسید</button>
                             </td>
                         </tr>
                     }
