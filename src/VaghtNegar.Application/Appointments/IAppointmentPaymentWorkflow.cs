@@ -9,9 +9,10 @@ public sealed record BookingHoldCreatedDto(
     DateTimeOffset StartsAtUtc, DateTimeOffset EndsAtUtc, string Status);
 
 public sealed record BookingRequestDto(
-    Guid Id, Guid DoctorId, string DoctorFullName, DateTimeOffset StartsAtUtc, DateTimeOffset EndsAtUtc,
-    long VisitFeeToman, string Status, DateTimeOffset HoldExpiresAtUtc, DateTimeOffset CreatedAtUtc,
-    DateTimeOffset? ReceiptSubmittedAtUtc, string? AdminNote, bool HasReceipt);
+    Guid Id, Guid DoctorId, string DoctorFullName, string PatientFullName, string PatientMobileNumber,
+    DateTimeOffset StartsAtUtc, DateTimeOffset EndsAtUtc, long VisitFeeToman, string Status,
+    DateTimeOffset HoldExpiresAtUtc, DateTimeOffset CreatedAtUtc, DateTimeOffset? ReceiptSubmittedAtUtc,
+    string? AdminNote, bool HasReceipt);
 
 public sealed record BookingRequestsPageDto(
     IReadOnlyList<BookingRequestDto> Items, int Page, int PageSize, int TotalCount, int TotalPages);
