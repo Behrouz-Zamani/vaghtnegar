@@ -138,6 +138,10 @@ else
                         </div>
                         <div class="patient-appointment-actions">
                             <span class="soft-status">@BookingStatusText(request.Status)</span>
+                            @if (request.Status == "AwaitingPayment")
+                            {
+                                <a class="btn btn-primary btn-small" href="@($"/booking/continue?id={request.Id}")">ادامه پرداخت</a>
+                            }
                         </div>
                     </article>
                 }
