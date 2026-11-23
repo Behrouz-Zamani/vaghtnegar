@@ -219,6 +219,18 @@ public sealed class VaghtNegarApiClient(IJSRuntime jsRuntime)
         string firstName, string lastName, string mobileNumber, DateOnly? birthDate, CancellationToken ct = default) =>
         SendAsync("POST", "bff/api/v1/patients/", new { firstName, lastName, mobileNumber, birthDate }, ct);
 
+    public Task<AdminMutationResult> UpdatePatientAsync(
+        Guid id, string firstName, string lastName, string mobileNumber, DateOnly? birthDate, CancellationToken ct = default) =>
+        SendAsync("PUT", $"bff/api/v1/patients/{id}", new { firstName, lastName, mobileNumber, birthDate }, ct);
+
+    public Task<AdminMutationResult> SetPatientActiveAsync(Guid id, bool isActive, CancellationToken ct = default) =>
+        SendAsync("PATCH", $"bff/api/v1/patients/{id}/active", new { isActive }, ct);
+
+    public Task<AdminMutationResult> LinkPatientIdentityAsync(
+        Guid id, string identityUserId, bool mobileNumberVerifiedByStaff, CancellationToken ct = default) =>
+        SendAsync("POST", $"bff/api/v1/patients/{id}/identity-link",
+            new { identityUserId, mobileNumberVerifiedByStaff }, ct);
+
     public async Task<List<AvailableSlotItem>> GetAvailableSlotsAsync(
         Guid doctorId, string jalaliDate, CancellationToken ct = default)
     {
@@ -455,7 +467,7 @@ public sealed record AppointmentListItem(Guid Id, Guid DoctorId, Guid PatientId,
 public sealed record AdminMutationResult(bool Succeeded, string Message);
 public sealed record AdminClinicItem(Guid Id, string Name, string Slug, bool IsActive);
 public sealed record AdminDoctorItem(Guid Id, Guid ClinicId, string FirstName, string LastName, string? MedicalCode, long VisitFeeToman, bool HasLinkedIdentity, bool IsActive);
-public sealed record PatientListItem(Guid Id, string FirstName, string LastName, string MobileNumber, DateOnly? BirthDate, bool IsActive);
+public sealed record PatientListItem(Guid Id, string FirstName, string LastName, string MobileNumber, DateOnly? BirthDate, bool IsActive, bool HasLinkedIdentity);
 public sealed record AvailableSlotItem(string JalaliDate, string DayName, string StartTime, string EndTime, DateTimeOffset StartsAtUtc, DateTimeOffset EndsAtUtc);
 
 public sealed record WorkingHourItem(Guid Id, Guid DoctorId, int DayOfWeek, string DayName, string StartTime, string EndTime, int SlotDurationMinutes, bool IsActive);
