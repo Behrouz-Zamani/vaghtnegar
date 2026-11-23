@@ -11,7 +11,7 @@ namespace VaghtNegar.Infrastructure.Persistence.Migrations;
 
 partial class CreateAppointmentBookingRequests
 {
-    protected override void BuildModel(ModelBuilder modelBuilder)
+    protected override void BuildTargetModel(ModelBuilder modelBuilder)
     {
         modelBuilder
             .HasAnnotation("ProductVersion", "10.0.0")
