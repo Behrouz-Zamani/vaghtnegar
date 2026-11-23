@@ -28,8 +28,8 @@ else if (booking is not null)
         <div class="panel-heading"><div><span class="eyebrow">خلاصه درخواست</span><h2>دکتر @booking.DoctorFullName</h2></div></div>
         <div class="stats-grid">
             <article class="stat-card"><div><span>مبلغ حق‌ویزیت</span><strong>@booking.VisitFeeToman.ToString("N0")</strong><small>تومان</small></div></article>
-            <article class="stat-card"><div><span>مهلت نگه‌داری</span><strong>@booking.HoldExpiresAtUtc.ToLocalTime().ToString("HH:mm:ss")</strong><small>پایان مهلت پرداخت</small></div></article>
-            <article class="stat-card"><div><span>وضعیت درخواست</span><strong>@StatusText(booking.Status)</strong><small>@booking.StartsAtUtc.ToLocalTime().ToString("yyyy/MM/dd HH:mm")</small></div></article>
+            <article class="stat-card"><div><span>@(booking.Status == "AwaitingLogin" || booking.Status == "AwaitingPayment" ? "مهلت نگه‌داری" : "وضعیت نگه‌داری زمان")</span><strong>@(booking.Status == "AwaitingLogin" || booking.Status == "AwaitingPayment" ? FormatTehran(booking.HoldExpiresAtUtc) : booking.Status == "AwaitingReview" ? "تا بررسی مدیر" : "پایان‌یافته")</strong><small>@(booking.Status == "AwaitingLogin" || booking.Status == "AwaitingPayment" ? "پایان مهلت پرداخت" : "زمان انتخاب‌شده")</small></div></article>
+            <article class="stat-card"><div><span>وضعیت درخواست</span><strong>@StatusText(booking.Status)</strong><small>@FormatTehranDateTime(booking.StartsAtUtc)</small></div></article>
         </div>
 
         @if (booking.Status == "AwaitingPayment")
@@ -174,6 +174,18 @@ else if (booking is not null)
         receiptBase64 = null;
         receiptName = null;
         error = null;
+    }
+
+    private static string FormatTehran(DateTimeOffset value) =>
+        TimeZoneInfo.ConvertTime(value, TehranZone()).ToString("HH:mm:ss");
+
+    private static string FormatTehranDateTime(DateTimeOffset value) =>
+        TimeZoneInfo.ConvertTime(value, TehranZone()).ToString("yyyy/MM/dd HH:mm");
+
+    private static TimeZoneInfo TehranZone()
+    {
+        try { return TimeZoneInfo.FindSystemTimeZoneById("Asia/Tehran"); }
+        catch (TimeZoneNotFoundException) { return TimeZoneInfo.FindSystemTimeZoneById("Iran Standard Time"); }
     }
 
     private static string StatusText(string status) => status switch
