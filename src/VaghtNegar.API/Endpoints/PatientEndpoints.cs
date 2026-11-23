@@ -8,8 +8,8 @@ public static class PatientEndpoints
 
     public static IEndpointRouteBuilder MapPatientEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        // Patient records contain personally identifiable information. Until a patient-self
-        // endpoint is implemented, all patient CRUD and identity-link operations are staff-only.
+        // Patient records contain personally identifiable information. All patient
+        // management and identity-link operations are restricted to clinic staff.
         var group = endpoints.MapGroup("/api/v1/patients")
             .WithTags("Patients")
             .RequireAuthorization(policy => policy.RequireRole(PatientStaffRoles));
@@ -74,10 +74,16 @@ public static class PatientEndpoints
                     ["identityUserId"] = ["شناسه sub کاربر Keycloak الزامی است."]
                 });
 
+            if (!request.MobileNumberVerifiedByStaff)
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["mobileNumberVerifiedByStaff"] = ["پیش از اتصال، باید شماره موبایل بیمار توسط کارمند احراز شده باشد."]
+                });
+
             try
             {
                 var patient = await service.LinkIdentityAccountAsync(
-                    id, request.IdentityUserId, mobileNumberVerifiedByStaff: true, ct);
+                    id, request.IdentityUserId, request.MobileNumberVerifiedByStaff, ct);
 
                 return patient is null
                     ? Results.NotFound(new { message = "پرونده بیمار یافت نشد." })
@@ -86,7 +92,7 @@ public static class PatientEndpoints
                         patient.Id,
                         patient.FirstName,
                         patient.LastName,
-                        identityLinked = true
+                        identityLinked = patient.HasLinkedIdentity
                     });
             }
             catch (PatientIdentityAlreadyLinkedException ex)
@@ -129,4 +135,4 @@ public static class PatientEndpoints
 
 public sealed record CreateOrUpdatePatientRequest(string FirstName, string LastName, string MobileNumber, DateOnly? BirthDate);
 public sealed record SetPatientActiveRequest(bool IsActive);
-public sealed record LinkPatientIdentityRequest(string IdentityUserId);
+public sealed record LinkPatientIdentityRequest(string IdentityUserId, bool MobileNumberVerifiedByStaff);
