@@ -37,6 +37,21 @@ else
         <span class="admin-status active">حساب متصل</span>
     </div>
 
+    <section class="panel-card doctor-schedule-section">
+        <div class="panel-heading">
+            <div><span class="eyebrow">تنظیمات مالی</span><h2>هزینه ویزیت</h2></div>
+        </div>
+        <p class="doctor-help">مبلغ ویزیت به تومان ثبت می‌شود و هنگام ثبت درخواست نوبت و پرداخت به بیمار نمایش داده خواهد شد.</p>
+        <div class="doctor-availability-filter">
+            <label>هزینه ویزیت (تومان)
+                <input class="admin-input" type="number" min="1" step="1000" @bind="visitFeeToman" />
+            </label>
+            <button class="btn btn-primary" disabled="@savingVisitFee" @onclick="SaveVisitFeeAsync">
+                @(savingVisitFee ? "در حال ذخیره..." : "ذخیره هزینه ویزیت")
+            </button>
+        </div>
+    </section>
+
     @if (!string.IsNullOrWhiteSpace(feedback))
     {
         <div class="admin-feedback @(feedbackIsError ? "error" : "success")" role="status">@feedback</div>
@@ -180,6 +195,8 @@ else
     private List<AvailableSlotItem> availableSlots = [];
     private bool loading = true;
     private bool saving;
+    private bool savingVisitFee;
+    private long visitFeeToman;
     private bool loadingSlots;
     private bool slotsLoaded;
     private bool feedbackIsError;
@@ -205,6 +222,8 @@ else
         loadError = null;
         var doctorResult = await ApiClient.GetMyDoctorResultAsync();
         doctor = doctorResult.Data;
+        if (doctor is not null)
+            visitFeeToman = doctor.VisitFeeToman;
         if (!doctorResult.Succeeded && !doctorResult.NotFound)
         {
             loadError = doctorResult.Error ?? "خطای نامشخص هنگام دریافت اطلاعات پزشک.";
@@ -358,6 +377,29 @@ else
 
         slotsLoaded = false;
         ShowFeedback("برنامه کاری با موفقیت ذخیره شد. تمام بازه‌ها برای نوبت‌دهی فعال شدند.", false);
+    }
+
+    private async Task SaveVisitFeeAsync()
+    {
+        if (visitFeeToman <= 0)
+        {
+            ShowFeedback("هزینه ویزیت باید بیشتر از صفر باشد.", true);
+            return;
+        }
+
+        savingVisitFee = true;
+        var result = await ApiClient.UpdateMyDoctorVisitFeeAsync(visitFeeToman);
+        savingVisitFee = false;
+
+        if (!result.Succeeded)
+        {
+            ShowFeedback(result.Message, true);
+            return;
+        }
+
+        if (doctor is not null)
+            doctor = doctor with { VisitFeeToman = visitFeeToman };
+        ShowFeedback("هزینه ویزیت با موفقیت ذخیره شد.", false);
     }
 
     private async Task LoadSlotsAsync()
