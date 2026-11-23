@@ -9,7 +9,7 @@ using VaghtNegar.Infrastructure.Persistence;
 
 namespace VaghtNegar.Infrastructure.Persistence.Migrations;
 
-partial class CreateAppointmentBookingRequests : Migration
+partial class CreateAppointmentBookingRequests
 {
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
