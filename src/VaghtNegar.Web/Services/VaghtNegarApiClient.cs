@@ -102,6 +102,39 @@ public sealed class VaghtNegarApiClient(IJSRuntime jsRuntime)
     public Task<AdminMutationResult> BookMyAppointmentAsync(Guid doctorId, DateTimeOffset startsAtUtc, string? patientNote, CancellationToken ct = default) =>
         SendAsync("POST", $"bff/api/v1/doctors/{doctorId}/appointments", new { startsAtUtc, patientNote }, ct);
 
+    public async Task<ApiReadResult<AppointmentCheckoutDto>> CreateAppointmentCheckoutAsync(Guid doctorId, DateTimeOffset startsAtUtc, string? patientNote, CancellationToken ct = default)
+    {
+        try
+        {
+            var response = await jsRuntime.InvokeAsync<BrowserApiResponse>(
+                "vaghtNegarApi.request", ct, "POST", "bff/api/v1/me/appointment-payments/checkout",
+                JsonSerializer.Serialize(new { doctorId, startsAtUtc, patientNote }, JsonOptions));
+            if (response.Status is < 200 or >= 300)
+                return new ApiReadResult<AppointmentCheckoutDto>(false, null, ReadError(response.Body, response.Status));
+            var data = JsonSerializer.Deserialize<AppointmentCheckoutDto>(response.Body, JsonOptions);
+            return data is null
+                ? new ApiReadResult<AppointmentCheckoutDto>(false, null, "پاسخ پرداخت نامعتبر است.")
+                : new ApiReadResult<AppointmentCheckoutDto>(true, data, null);
+        }
+        catch (JSException) { return new ApiReadResult<AppointmentCheckoutDto>(false, null, "ارتباط با سرور برقرار نشد."); }
+        catch (JsonException) { return new ApiReadResult<AppointmentCheckoutDto>(false, null, "پاسخ پرداخت قابل پردازش نیست."); }
+    }
+
+    public Task<AdminMutationResult> SubmitAppointmentReceiptAsync(Guid paymentId, string reference, string contentType, string imageBase64, CancellationToken ct = default) =>
+        SendAsync("POST", $"bff/api/v1/me/appointment-payments/{paymentId}/receipt", new { reference, contentType, imageBase64 }, ct);
+
+    public Task<ApiReadResult<List<MyAppointmentPaymentDto>>> GetMyAppointmentPaymentsAsync(CancellationToken ct = default) =>
+        TryGetCollectionResultAsync<MyAppointmentPaymentDto>("bff/api/v1/me/appointment-payments", ct);
+
+    public Task<ApiReadResult<List<PendingAppointmentPaymentDto>>> GetPendingAppointmentPaymentsAsync(CancellationToken ct = default) =>
+        TryGetCollectionResultAsync<PendingAppointmentPaymentDto>("bff/api/v1/appointment-payments/pending", ct);
+
+    public Task<AdminMutationResult> ApproveAppointmentPaymentAsync(Guid id, CancellationToken ct = default) =>
+        SendAsync("POST", $"bff/api/v1/appointment-payments/{id}/approve", new Dictionary<string, object>(), ct);
+
+    public Task<AdminMutationResult> RejectAppointmentPaymentAsync(Guid id, string reason, CancellationToken ct = default) =>
+        SendAsync("POST", $"bff/api/v1/appointment-payments/{id}/reject", new { reason }, ct);
+
     public Task<ApiReadResult<List<WorkingHourItem>>> GetMyWorkingHoursResultAsync(CancellationToken ct = default) =>
         TryGetCollectionResultAsync<WorkingHourItem>("bff/api/v1/me/doctor/schedule/working-hours", ct);
 
@@ -387,3 +420,7 @@ public sealed record WorkingHourInputItem(int DayOfWeek, string StartTime, strin
 public sealed record PatientProfileDto(Guid Id, string FirstName, string LastName, string MobileNumber, DateOnly? BirthDate);
 public sealed record PatientAppointmentDto(Guid Id, Guid ClinicId, Guid DoctorId, string DoctorFullName, DateTimeOffset StartsAtUtc, DateTimeOffset EndsAtUtc, string Status, string? PatientNote, DateTimeOffset CreatedAtUtc);
 public sealed record PatientAppointmentsPageDto(IReadOnlyList<PatientAppointmentDto> Items, int Page, int PageSize, int TotalCount, int TotalPages);
+
+public sealed record AppointmentCheckoutDto(Guid Id, Guid AppointmentId, long AmountToman, string Status, DateTimeOffset ExpiresAtUtc, string BankName, string AccountHolder, string CardNumber, string Iban);
+public sealed record MyAppointmentPaymentDto(Guid Id, Guid AppointmentId, Guid DoctorId, Guid doctor, long AmountToman, string Status, DateTimeOffset CreatedAtUtc, DateTimeOffset ExpiresAtUtc, string? ReceiptReference, DateTimeOffset? ReceiptSubmittedAtUtc, string? ReviewNote, DateTimeOffset StartsAtUtc, DateTimeOffset EndsAtUtc);
+public sealed record PendingAppointmentPaymentDto(Guid Id, Guid AppointmentId, Guid PatientId, Guid DoctorId, long AmountToman, string Status, string? ReceiptReference, string? ReceiptContentType, string? ReceiptImageBase64, DateTimeOffset? ReceiptSubmittedAtUtc, Guid PatientName, DateTimeOffset StartsAtUtc, DateTimeOffset EndsAtUtc);
