@@ -80,6 +80,9 @@ else if (booking is not null)
     [SupplyParameterFromQuery(Name = "token")]
     public string? Token { get; set; }
 
+    [SupplyParameterFromQuery(Name = "id")]
+    public Guid? RequestId { get; set; }
+
     private BookingRequestDto? booking;
     private bool loading = true;
     private bool submitting;
@@ -91,23 +94,32 @@ else if (booking is not null)
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender) return;
-        if (string.IsNullOrWhiteSpace(Token))
+        if (!string.IsNullOrWhiteSpace(Token))
         {
-            error = "شناسه پیگیری درخواست موجود نیست.";
-            loading = false;
-            StateHasChanged();
-            return;
+            var claim = await ApiClient.ClaimBookingHoldAsync(Token);
+            if (!claim.Succeeded)
+            {
+                error = claim.Error ?? "اتصال درخواست به حساب کاربری انجام نشد.";
+                loading = false;
+                StateHasChanged();
+                return;
+            }
+            booking = claim.Data;
+            RequestId = booking?.Id;
+        }
+        else if (RequestId.HasValue)
+        {
+            var result = await ApiClient.GetMyBookingRequestAsync(RequestId.Value);
+            if (!result.Succeeded)
+                error = result.Error ?? "درخواست نوبت یافت نشد.";
+            else
+                booking = result.Data;
+        }
+        else
+        {
+            error = "شناسه درخواست یا شناسه پیگیری موجود نیست.";
         }
 
-        var claim = await ApiClient.ClaimBookingHoldAsync(Token);
-        if (!claim.Succeeded)
-        {
-            error = claim.Error ?? "اتصال درخواست به حساب کاربری انجام نشد.";
-            loading = false;
-            StateHasChanged();
-            return;
-        }
-        booking = claim.Data;
         loading = false;
         StateHasChanged();
     }
@@ -137,18 +149,28 @@ else if (booking is not null)
 
     private async Task SubmitReceiptAsync()
     {
-        if (string.IsNullOrWhiteSpace(Token) || string.IsNullOrWhiteSpace(receiptBase64) ||
+        if ((!RequestId.HasValue && string.IsNullOrWhiteSpace(Token)) || string.IsNullOrWhiteSpace(receiptBase64) ||
             string.IsNullOrWhiteSpace(receiptName) || string.IsNullOrWhiteSpace(receiptContentType)) return;
         submitting = true;
-        var result = await ApiClient.SubmitBookingReceiptAsync(Token, receiptName, receiptContentType, receiptBase64);
+        var result = RequestId.HasValue
+            ? await ApiClient.SubmitMyBookingReceiptAsync(RequestId.Value, receiptName, receiptContentType, receiptBase64)
+            : await ApiClient.SubmitBookingReceiptAsync(Token!, receiptName, receiptContentType, receiptBase64);
         submitting = false;
         if (!result.Succeeded)
         {
             error = result.Message;
             return;
         }
-        var refreshed = await ApiClient.GetBookingHoldAsync(Token);
-        booking = refreshed.Data;
+        if (RequestId.HasValue)
+        {
+            var refreshed = await ApiClient.GetMyBookingRequestAsync(RequestId.Value);
+            booking = refreshed.Data;
+        }
+        else
+        {
+            var refreshed = await ApiClient.GetBookingHoldAsync(Token!);
+            booking = refreshed.Data;
+        }
         receiptBase64 = null;
         receiptName = null;
         error = null;
