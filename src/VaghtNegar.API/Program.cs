@@ -150,6 +150,7 @@ app.MapDoctorPortalEndpoints();
 app.MapPatientEndpoints();
 app.MapSchedulingEndpoints();
 app.MapAppointmentBookingEndpoints();
+app.MapAppointmentPaymentEndpoints();
 app.MapAppointmentManagementEndpoints();
 app.MapPatientPortalEndpoints();
 
