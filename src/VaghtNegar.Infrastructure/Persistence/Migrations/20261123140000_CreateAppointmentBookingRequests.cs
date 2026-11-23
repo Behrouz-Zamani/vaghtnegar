@@ -8,7 +8,7 @@ namespace VaghtNegar.Infrastructure.Persistence.Migrations;
 
 [DbContext(typeof(VaghtNegarDbContext))]
 [Migration("20261123140000_CreateAppointmentBookingRequests")]
-public sealed partial class CreateAppointmentBookingRequests : Migration
+public partial class CreateAppointmentBookingRequests : Migration
 {
     protected override void Up(MigrationBuilder migrationBuilder)
     {
