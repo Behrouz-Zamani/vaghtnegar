@@ -43,6 +43,7 @@ public static class AppointmentPaymentEndpoints
             var subject = user.FindFirst("sub")?.Value;
             if (string.IsNullOrWhiteSpace(subject)) return Results.Unauthorized();
             try { return Results.Ok(await workflow.ClaimAsync(token, subject, ct)); }
+            catch (UnauthorizedAccessException) { return Results.Forbid(); }
             catch (KeyNotFoundException ex) { return Results.NotFound(new { message = ex.Message }); }
             catch (InvalidOperationException ex) { return Results.Conflict(new { message = ex.Message }); }
             catch (ArgumentException ex) { return Results.BadRequest(new { message = ex.Message }); }
