@@ -27,4 +27,12 @@ public sealed class SchedulingRepository(VaghtNegarDbContext db) : ISchedulingRe
         await db.Appointments.AsNoTracking()
             .Where(x => x.DoctorId == doctorId && x.StartsAtUtc < dayEndUtc && x.EndsAtUtc > dayStartUtc)
             .ToListAsync(ct);
+
+    public async Task<IReadOnlyList<AppointmentBookingRequest>> GetBookingRequestsForDayAsync(Guid doctorId, DateTimeOffset dayStartUtc, DateTimeOffset dayEndUtc, CancellationToken ct) =>
+        await db.AppointmentBookingRequests.AsNoTracking()
+            .Where(x => x.DoctorId == doctorId && x.StartsAtUtc < dayEndUtc && x.EndsAtUtc > dayStartUtc &&
+                (x.Status == VaghtNegar.Domain.Enums.AppointmentBookingRequestStatus.AwaitingReview ||
+                 ((x.Status == VaghtNegar.Domain.Enums.AppointmentBookingRequestStatus.AwaitingLogin ||
+                   x.Status == VaghtNegar.Domain.Enums.AppointmentBookingRequestStatus.AwaitingPayment) && x.HoldExpiresAtUtc > DateTimeOffset.UtcNow)))
+            .ToListAsync(ct);
 }
