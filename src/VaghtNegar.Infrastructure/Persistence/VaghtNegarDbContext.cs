@@ -1,6 +1,5 @@
 using Microsoft.EntityFrameworkCore;
 using VaghtNegar.Domain.Entities;
-using VaghtNegar.Domain.Entities;
 
 namespace VaghtNegar.Infrastructure.Persistence;
 
