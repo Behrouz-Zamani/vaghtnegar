@@ -8,4 +8,5 @@ public interface ISchedulingRepository
     Task<IReadOnlyList<DoctorWorkingHour>> GetWorkingHoursAsync(Guid doctorId, CancellationToken ct);
     Task ReplaceWorkingHoursAsync(Guid doctorId, IReadOnlyList<DoctorWorkingHour> hours, CancellationToken ct);
     Task<IReadOnlyList<Appointment>> GetAppointmentsForDayAsync(Guid doctorId, DateTimeOffset dayStartUtc, DateTimeOffset dayEndUtc, CancellationToken ct);
+    Task<IReadOnlyList<AppointmentBookingRequest>> GetBookingRequestsForDayAsync(Guid doctorId, DateTimeOffset dayStartUtc, DateTimeOffset dayEndUtc, CancellationToken ct);
 }
