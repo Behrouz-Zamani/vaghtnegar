@@ -242,9 +242,13 @@ public sealed class AppointmentPaymentWorkflow(
     private async Task<BookingRequestDto> MapAsync(Guid id, CancellationToken ct) =>
         await (from booking in db.AppointmentBookingRequests.AsNoTracking()
                join doctor in db.Doctors.AsNoTracking() on booking.DoctorId equals doctor.Id
+               join patient in db.Patients.AsNoTracking() on booking.PatientId equals patient.Id into patientJoin
+               from patient in patientJoin.DefaultIfEmpty()
                where booking.Id == id
                select new BookingRequestDto(
                    booking.Id, booking.DoctorId, doctor.FirstName + " " + doctor.LastName,
+                   patient == null ? "—" : patient.FirstName + " " + patient.LastName,
+                   patient == null ? "" : patient.MobileNumber,
                    booking.StartsAtUtc, booking.EndsAtUtc, booking.VisitFeeToman,
                    booking.Status.ToString(), booking.HoldExpiresAtUtc, booking.CreatedAtUtc,
                    booking.ReceiptSubmittedAtUtc, booking.AdminNote, booking.ReceiptContent != null))
