@@ -141,9 +141,11 @@ public sealed class AppointmentPaymentWorkflow(
         if (conflict) throw new InvalidOperationException("این ساعت قبلاً به نوبت دیگری اختصاص یافته است.");
 
         booking.Approve(reviewerIdentityUserId);
-        db.Appointments.Add(new Appointment(
+        var appointment = new Appointment(
             booking.ClinicId, booking.DoctorId, booking.PatientId.Value,
-            booking.StartsAtUtc, booking.EndsAtUtc, booking.PatientNote));
+            booking.StartsAtUtc, booking.EndsAtUtc, booking.PatientNote);
+        appointment.Confirm();
+        db.Appointments.Add(appointment);
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
         return await MapAsync(requestId, ct);
