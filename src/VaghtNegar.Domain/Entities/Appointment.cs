@@ -55,6 +55,12 @@ public sealed class Appointment
         Status = AppointmentStatus.Cancelled;
     }
 
+    public void ReleasePaymentHold()
+    {
+        if (Status == AppointmentStatus.Pending)
+            Status = AppointmentStatus.Cancelled;
+    }
+
     public void Complete()
     {
         if (Status != AppointmentStatus.Confirmed)
