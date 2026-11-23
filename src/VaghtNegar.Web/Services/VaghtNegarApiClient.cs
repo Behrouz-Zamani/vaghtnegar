@@ -107,6 +107,9 @@ public sealed class VaghtNegarApiClient(IJSRuntime jsRuntime)
         return result.Succeeded ? result.Data : null;
     }
 
+    public Task<AdminMutationResult> UpdateMyDoctorVisitFeeAsync(long visitFeeToman, CancellationToken ct = default) =>
+        SendAsync("PUT", "bff/api/v1/me/doctor/visit-fee", new { visitFeeToman }, ct);
+
     public Task<ApiReadResult<PatientProfileDto>> GetMyPatientProfileResultAsync(CancellationToken ct = default) =>
         TryGetItemResultAsync<PatientProfileDto>("bff/api/v1/me/patient", ct, allowNotFound: true);
 
