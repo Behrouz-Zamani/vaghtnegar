@@ -79,6 +79,16 @@ public sealed class AppointmentPayment
         ReviewNote = reason.Trim();
     }
 
+    public void CancelBeforeApproval(string actor)
+    {
+        if (Status is not (AppointmentPaymentStatus.AwaitingReceipt or AppointmentPaymentStatus.ReceiptSubmitted))
+            return;
+        Status = AppointmentPaymentStatus.Cancelled;
+        ReviewedAtUtc = DateTimeOffset.UtcNow;
+        ReviewedBy = string.IsNullOrWhiteSpace(actor) ? "system" : actor;
+        ReviewNote = "درخواست نوبت پیش از تأیید پرداخت لغو شد.";
+    }
+
     public bool ExpireIfDue(DateTimeOffset now)
     {
         if (Status != AppointmentPaymentStatus.AwaitingReceipt || ExpiresAtUtc > now)
