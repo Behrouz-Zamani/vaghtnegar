@@ -93,7 +93,16 @@ public sealed class AppointmentBookingRepository(VaghtNegarDbContext db) : IAppo
             x.EndsAtUtc > startsAtUtc,
             cancellationToken);
 
-        if (hasOverlap)
+        var hasActiveBookingHold = await db.AppointmentBookingRequests.AnyAsync(x =>
+            x.DoctorId == doctor.Id &&
+            (x.Status == AppointmentBookingRequestStatus.AwaitingReview ||
+             ((x.Status == AppointmentBookingRequestStatus.AwaitingLogin ||
+               x.Status == AppointmentBookingRequestStatus.AwaitingPayment) &&
+              x.HoldExpiresAtUtc > DateTimeOffset.UtcNow)) &&
+            x.StartsAtUtc < endsAtUtc && x.EndsAtUtc > startsAtUtc,
+            cancellationToken);
+
+        if (hasOverlap || hasActiveBookingHold)
         {
             await transaction.RollbackAsync(cancellationToken);
             return new AppointmentBookingResult(AppointmentBookingFailure.SlotUnavailable, null);
