@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using VaghtNegar.Application.Appointments;
+using VaghtNegar.Application.Scheduling;
 
 namespace VaghtNegar.API.Endpoints;
 
@@ -17,6 +18,7 @@ public static class AppointmentPaymentEndpoints
             IAppointmentPaymentWorkflow workflow, CancellationToken ct) =>
         {
             try { return Results.Created("/api/v1/booking-requests", await workflow.CreateHoldAsync(doctorId, request, ct)); }
+            catch (DoctorForScheduleNotFoundException ex) { return Results.NotFound(new { message = ex.Message }); }
             catch (KeyNotFoundException ex) { return Results.NotFound(new { message = ex.Message }); }
             catch (InvalidOperationException ex) { return Results.Conflict(new { message = ex.Message }); }
             catch (ArgumentException ex) { return Results.BadRequest(new { message = ex.Message }); }
