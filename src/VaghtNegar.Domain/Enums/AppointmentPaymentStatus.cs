@@ -6,5 +6,6 @@ public enum AppointmentPaymentStatus
     ReceiptSubmitted = 2,
     Approved = 3,
     Rejected = 4,
-    Expired = 5
+    Expired = 5,
+    Cancelled = 6
 }
