@@ -23,6 +23,8 @@ public static class AppointmentPaymentEndpoints
         {
             var subject = user.FindFirst("sub")?.Value;
             if (string.IsNullOrWhiteSpace(subject)) return Results.Unauthorized();
+            if (request.StartsAtUtc <= DateTimeOffset.UtcNow.AddMinutes(10))
+                return Results.BadRequest(new { message = "برای نگه‌داشتن زمان، نوبت باید حداقل ۱۰ دقیقه بعد از زمان فعلی باشد." });
             try
             {
                 var appointment = await booking.BookAsync(request.DoctorId, subject,
@@ -37,7 +39,7 @@ public static class AppointmentPaymentEndpoints
 
                 return Results.Created($"/api/v1/me/appointment-payments/{payment.Id}", new
                 {
-                    payment.Id, payment.AppointmentId, payment.AmountToman, payment.Status,
+                    payment.Id, payment.AppointmentId, payment.AmountToman, status = payment.Status.ToString(),
                     payment.ExpiresAtUtc,
                     bankName = configuration["Payments:BankName"] ?? "",
                     accountHolder = configuration["Payments:AccountHolder"] ?? "",
@@ -62,7 +64,7 @@ public static class AppointmentPaymentEndpoints
             await ExpireDueAsync(db, ct);
             var rows = await db.AppointmentPayments.AsNoTracking().Where(x => x.PatientId == patientId)
                 .OrderByDescending(x => x.CreatedAtUtc)
-                .Select(x => new { x.Id, x.AppointmentId, x.DoctorId, doctor = x.Appointment.DoctorId,
+                .Select(x => new { x.Id, x.AppointmentId, x.DoctorId, doctorName = db.Doctors.Where(d => d.Id == x.DoctorId).Select(d => d.FirstName + " " + d.LastName).FirstOrDefault(),
                     x.AmountToman, status = x.Status.ToString(), x.CreatedAtUtc, x.ExpiresAtUtc,
                     x.ReceiptReference, x.ReceiptSubmittedAtUtc, x.ReviewNote,
                     x.Appointment.StartsAtUtc, x.Appointment.EndsAtUtc })
@@ -104,16 +106,20 @@ public static class AppointmentPaymentEndpoints
         staff.MapGet("/pending", async (VaghtNegarDbContext db, CancellationToken ct) =>
         {
             await ExpireDueAsync(db, ct);
-            var rows = await db.AppointmentPayments.AsNoTracking()
-                .Where(x => x.Status == AppointmentPaymentStatus.ReceiptSubmitted)
-                .OrderBy(x => x.ReceiptSubmittedAtUtc)
-                .Select(x => new
+            var rows = await (from payment in db.AppointmentPayments.AsNoTracking()
+                join appointment in db.Appointments on payment.AppointmentId equals appointment.Id
+                join patientRecord in db.Patients on payment.PatientId equals patientRecord.Id
+                join doctorRecord in db.Doctors on payment.DoctorId equals doctorRecord.Id
+                where payment.Status == AppointmentPaymentStatus.ReceiptSubmitted
+                orderby payment.ReceiptSubmittedAtUtc
+                select new
                 {
-                    x.Id, x.AppointmentId, x.PatientId, x.DoctorId, x.AmountToman,
-                    status = x.Status.ToString(), x.ReceiptReference, x.ReceiptContentType,
-                    x.ReceiptImageBase64, x.ReceiptSubmittedAtUtc,
-                    patientName = x.Appointment.PatientId,
-                    x.Appointment.StartsAtUtc, x.Appointment.EndsAtUtc
+                    payment.Id, payment.AppointmentId, payment.PatientId, payment.DoctorId, payment.AmountToman,
+                    status = payment.Status.ToString(), payment.ReceiptReference, payment.ReceiptContentType,
+                    payment.ReceiptImageBase64, payment.ReceiptSubmittedAtUtc,
+                    patientName = patientRecord.FirstName + " " + patientRecord.LastName,
+                    doctorName = doctorRecord.FirstName + " " + doctorRecord.LastName,
+                    appointment.StartsAtUtc, appointment.EndsAtUtc
                 }).ToListAsync(ct);
             return Results.Ok(rows);
         }).WithName("GetPendingAppointmentPayments");
