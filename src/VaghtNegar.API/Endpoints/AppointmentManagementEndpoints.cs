@@ -1,4 +1,7 @@
+using Microsoft.EntityFrameworkCore;
 using VaghtNegar.Application.Appointments;
+using VaghtNegar.Domain.Enums;
+using VaghtNegar.Infrastructure.Persistence;
 
 namespace VaghtNegar.API.Endpoints;
 
@@ -76,10 +79,18 @@ public static class AppointmentManagementEndpoints
         group.MapPatch("/{id:guid}/" + action, async Task<IResult> (
             Guid id,
             AppointmentManagementService service,
+            VaghtNegarDbContext db,
             CancellationToken cancellationToken) =>
         {
             try
             {
+                if (action == "confirm")
+                {
+                    var payment = await db.AppointmentPayments.AsNoTracking()
+                        .FirstOrDefaultAsync(x => x.AppointmentId == id, cancellationToken);
+                    if (payment is not null && payment.Status != AppointmentPaymentStatus.Approved)
+                        return Results.Conflict(new { message = "این نوبت آنلاین است و تا تأیید رسید پرداخت، امکان قطعی‌کردن آن وجود ندارد." });
+                }
                 var result = await service.ChangeStatusAsync(id, action, cancellationToken);
                 return Results.Ok(result);
             }
