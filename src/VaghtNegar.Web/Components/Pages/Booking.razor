@@ -144,7 +144,7 @@
         }
 
         var returnUrl = "/booking/continue?token=" + Uri.EscapeDataString(result.Data.AccessToken);
-        Navigation.NavigateTo("/account/login?returnUrl=" + Uri.EscapeDataString(returnUrl));
+        Navigation.NavigateTo("/account/login?returnUrl=" + Uri.EscapeDataString(returnUrl), forceLoad: true);
     }
 
     private static DateOnly SchedulingDate(string value)
