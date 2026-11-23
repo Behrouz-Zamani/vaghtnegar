@@ -80,6 +80,12 @@ public sealed class AppointmentPaymentWorkflow(
     public async Task<BookingRequestDto> ClaimAsync(string token, string identityUserId, CancellationToken ct)
     {
         var booking = await FindByTokenAsync(token, ct);
+        if (booking.IdentityUserId == identityUserId && booking.PatientId.HasValue)
+            return await MapAsync(booking.Id, ct);
+        if (!string.IsNullOrWhiteSpace(booking.IdentityUserId) &&
+            !string.Equals(booking.IdentityUserId, identityUserId, StringComparison.Ordinal))
+            throw new UnauthorizedAccessException("این درخواست قبلاً به حساب کاربری دیگری متصل شده است.");
+
         var patient = await db.Patients.FirstOrDefaultAsync(
             x => x.IdentityUserId == identityUserId && x.IsActive, ct);
         if (patient is null)
