@@ -76,6 +76,32 @@ public static class AppointmentPaymentEndpoints
         .RequireAuthorization(policy => policy.RequireRole("Patient"))
         .WithName("GetMyBookingRequests");
 
+        var patientRequests = endpoints.MapGroup("/api/v1/me/booking-requests")
+            .WithTags("Patient Portal - Payments")
+            .RequireAuthorization(policy => policy.RequireRole("Patient"));
+
+        patientRequests.MapGet("/{id:guid}", async Task<IResult> (
+            Guid id, ClaimsPrincipal user, IAppointmentPaymentWorkflow workflow, CancellationToken ct) =>
+        {
+            var subject = user.FindFirst("sub")?.Value;
+            if (string.IsNullOrWhiteSpace(subject)) return Results.Unauthorized();
+            var result = await workflow.GetMyRequestAsync(id, subject, ct);
+            return result is null ? Results.NotFound(new { message = "درخواست نوبت یافت نشد." }) : Results.Ok(result);
+        }).WithName("GetMyBookingRequestById");
+
+        patientRequests.MapPost("/{id:guid}/receipt", async Task<IResult> (
+            Guid id, SubmitPaymentReceiptRequest request, ClaimsPrincipal user,
+            IAppointmentPaymentWorkflow workflow, CancellationToken ct) =>
+        {
+            var subject = user.FindFirst("sub")?.Value;
+            if (string.IsNullOrWhiteSpace(subject)) return Results.Unauthorized();
+            try { return Results.Ok(await workflow.SubmitMyReceiptAsync(id, subject, request, ct)); }
+            catch (UnauthorizedAccessException) { return Results.Forbid(); }
+            catch (KeyNotFoundException ex) { return Results.NotFound(new { message = ex.Message }); }
+            catch (InvalidOperationException ex) { return Results.Conflict(new { message = ex.Message }); }
+            catch (ArgumentException ex) { return Results.BadRequest(new { message = ex.Message }); }
+        }).WithName("SubmitReceiptForMyBookingRequest");
+
         var admin = endpoints.MapGroup("/api/v1/admin/booking-requests")
             .WithTags("Appointment Booking and Payment")
             .RequireAuthorization(policy => policy.RequireRole(AdminRoles));
