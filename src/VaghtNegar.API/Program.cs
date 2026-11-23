@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using System.Text.Json;
+using VaghtNegar.API.Background;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using VaghtNegar.API.Endpoints;
@@ -95,6 +96,7 @@ builder.Services.AddAuthorization();
 
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddHostedService<AppointmentPaymentExpiryWorker>();
 
 var app = builder.Build();
 
@@ -152,6 +154,7 @@ app.MapSchedulingEndpoints();
 app.MapAppointmentBookingEndpoints();
 app.MapAppointmentManagementEndpoints();
 app.MapPatientPortalEndpoints();
+app.MapAppointmentPaymentEndpoints();
 
 app.Run();
 
