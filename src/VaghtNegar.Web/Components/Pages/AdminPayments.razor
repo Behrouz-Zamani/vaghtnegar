@@ -52,8 +52,12 @@
                     <input class="admin-input" @bind="rejectionReasons[payment.Id]" maxlength="500" placeholder="مثلاً مبلغ واریزی با مبلغ فاکتور مطابقت ندارد" />
                 </label>
                 <div class="admin-form-actions">
-                    <button class="btn btn-primary" disabled="@savingId.HasValue" @onclick="() => ApproveAsync(payment.Id)">تأیید پرداخت و قطعی‌کردن نوبت</button>
-                    <button class="btn btn-danger-soft" disabled="@savingId.HasValue" @onclick="() => RejectAsync(payment.Id)">رد رسید و آزادسازی زمان</button>
+                    <button class="btn btn-primary" disabled="@savingId.HasValue" @onclick="() => ApproveAsync(payment.Id)">
+                        @(savingId == payment.Id ? "در حال ثبت..." : "تأیید پرداخت و قطعی‌کردن نوبت")
+                    </button>
+                    <button class="btn btn-danger-soft" disabled="@savingId.HasValue" @onclick="() => RejectAsync(payment.Id)">
+                        @(savingId == payment.Id ? "در حال ثبت..." : "رد رسید و آزادسازی زمان")
+                    </button>
                 </div>
             </article>
         }
@@ -75,29 +79,62 @@
     {
         loading = true;
         error = null;
-        var result = await ApiClient.GetPendingAppointmentPaymentsAsync();
-        if (result.Succeeded && result.Data is not null)
+
+        try
         {
-            payments = result.Data;
-            foreach (var payment in payments)
-                rejectionReasons.TryAdd(payment.Id, "");
+            var result = await ApiClient.GetPendingAppointmentPaymentsAsync();
+            if (result.Succeeded && result.Data is not null)
+            {
+                payments = result.Data;
+                foreach (var payment in payments)
+                    rejectionReasons.TryAdd(payment.Id, "");
+            }
+            else
+            {
+                error = result.Error ?? "دریافت رسیدها ناموفق بود.";
+            }
         }
-        else error = result.Error ?? "دریافت رسیدها ناموفق بود.";
-        loading = false;
+        catch (Exception)
+        {
+            error = "در دریافت رسیدها خطایی رخ داد. اتصال API را بررسی و دوباره تلاش کنید.";
+        }
+        finally
+        {
+            loading = false;
+        }
     }
 
     private async Task ApproveAsync(Guid id)
     {
+        if (savingId.HasValue) return;
+
         savingId = id;
-        var result = await ApiClient.ApproveAppointmentPaymentAsync(id);
-        savingId = null;
-        feedback = result.Message;
-        feedbackIsError = !result.Succeeded;
-        if (result.Succeeded) await LoadAsync();
+        feedback = null;
+
+        try
+        {
+            var result = await ApiClient.ApproveAppointmentPaymentAsync(id);
+            feedback = result.Message;
+            feedbackIsError = !result.Succeeded;
+
+            if (result.Succeeded)
+                await LoadAsync();
+        }
+        catch (Exception)
+        {
+            feedback = "ثبت تأیید پرداخت با خطا مواجه شد. وضعیت عملیات را بررسی و دوباره تلاش کنید.";
+            feedbackIsError = true;
+        }
+        finally
+        {
+            savingId = null;
+        }
     }
 
     private async Task RejectAsync(Guid id)
     {
+        if (savingId.HasValue) return;
+
         var reason = rejectionReasons.GetValueOrDefault(id, "");
         if (string.IsNullOrWhiteSpace(reason))
         {
@@ -105,11 +142,30 @@
             feedbackIsError = true;
             return;
         }
+
         savingId = id;
-        var result = await ApiClient.RejectAppointmentPaymentAsync(id, reason);
-        savingId = null;
-        feedback = result.Message;
-        feedbackIsError = !result.Succeeded;
-        if (result.Succeeded) await LoadAsync();
+        feedback = null;
+
+        try
+        {
+            var result = await ApiClient.RejectAppointmentPaymentAsync(id, reason.Trim());
+            feedback = result.Message;
+            feedbackIsError = !result.Succeeded;
+
+            if (result.Succeeded)
+            {
+                rejectionReasons[id] = "";
+                await LoadAsync();
+            }
+        }
+        catch (Exception)
+        {
+            feedback = "ثبت رد رسید با خطا مواجه شد. اتصال API را بررسی کنید؛ در صورت تکرار، ابتدا وضعیت پرداخت را بازخوانی کنید.";
+            feedbackIsError = true;
+        }
+        finally
+        {
+            savingId = null;
+        }
     }
 }
