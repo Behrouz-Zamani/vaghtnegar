@@ -91,7 +91,12 @@ public static class AppointmentPaymentEndpoints
             var receipt = await workflow.GetReceiptAsync(id, ct);
             return receipt is null
                 ? Results.NotFound(new { message = "تصویر رسید یافت نشد." })
-                : Results.File(receipt.Value.Content, receipt.Value.ContentType, receipt.Value.FileName);
+                : Results.Ok(new
+                {
+                    contentType = receipt.Value.ContentType,
+                    fileName = receipt.Value.FileName,
+                    base64Content = Convert.ToBase64String(receipt.Value.Content)
+                });
         })
         .WithName("GetBookingPaymentReceipt");
 
