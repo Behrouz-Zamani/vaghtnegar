@@ -30,6 +30,12 @@ public sealed class Doctor
         UpdatedAtUtc = DateTimeOffset.UtcNow;
     }
 
+    public void UpdateVisitFee(long visitFeeToman)
+    {
+        SetVisitFee(visitFeeToman);
+        UpdatedAtUtc = DateTimeOffset.UtcNow;
+    }
+
     private void SetVisitFee(long visitFeeToman)
     {
         if (visitFeeToman < 0) throw new ArgumentOutOfRangeException(nameof(visitFeeToman), "Visit fee cannot be negative.");
