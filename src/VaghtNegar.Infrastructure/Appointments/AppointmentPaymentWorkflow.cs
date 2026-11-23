@@ -79,6 +79,7 @@ public sealed class AppointmentPaymentWorkflow(
 
     public async Task<BookingRequestDto> ClaimAsync(string token, string identityUserId, CancellationToken ct)
     {
+        await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
         var booking = await FindByTokenAsync(token, ct);
         if (booking.IdentityUserId == identityUserId && booking.PatientId.HasValue)
             return await MapAsync(booking.Id, ct);
@@ -92,6 +93,7 @@ public sealed class AppointmentPaymentWorkflow(
             throw new InvalidOperationException("پرونده بیمار به حساب کاربری شما متصل نیست. ابتدا اتصال پرونده توسط پذیرش انجام شود.");
         booking.AttachPatient(patient.Id, identityUserId);
         await db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
         return await MapAsync(booking.Id, ct);
     }
 
