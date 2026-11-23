@@ -59,7 +59,6 @@ public sealed class AppointmentPayment
 
     public void Approve(string reviewer)
     {
-        EnsureNotExpired();
         if (Status != AppointmentPaymentStatus.ReceiptSubmitted)
             throw new InvalidOperationException("فقط رسیدهای ارسال‌شده قابل تأیید هستند.");
         Status = AppointmentPaymentStatus.Approved;
@@ -70,7 +69,6 @@ public sealed class AppointmentPayment
 
     public void Reject(string reviewer, string reason)
     {
-        EnsureNotExpired();
         if (Status != AppointmentPaymentStatus.ReceiptSubmitted)
             throw new InvalidOperationException("فقط رسیدهای ارسال‌شده قابل رد هستند.");
         if (string.IsNullOrWhiteSpace(reason) || reason.Trim().Length > 500)
@@ -83,7 +81,7 @@ public sealed class AppointmentPayment
 
     public bool ExpireIfDue(DateTimeOffset now)
     {
-        if (Status is not (AppointmentPaymentStatus.AwaitingReceipt or AppointmentPaymentStatus.ReceiptSubmitted) || ExpiresAtUtc > now)
+        if (Status != AppointmentPaymentStatus.AwaitingReceipt || ExpiresAtUtc > now)
             return false;
         Status = AppointmentPaymentStatus.Expired;
         return true;
