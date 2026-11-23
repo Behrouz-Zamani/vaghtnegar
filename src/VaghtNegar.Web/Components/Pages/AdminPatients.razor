@@ -1,0 +1,335 @@
+@page "/admin/patients"
+@attribute [Authorize(Roles = "Receptionist,ClinicAdmin,SuperAdmin")]
+@using System.Globalization
+@inject VaghtNegarApiClient ApiClient
+
+<PageTitle>مدیریت بیماران | وقت‌نگار</PageTitle>
+
+<section class="page-heading">
+    <span class="eyebrow">مدیریت پرونده‌ها</span>
+    <h1>مدیریت بیماران</h1>
+    <p class="page-lead">ثبت و ویرایش پرونده، جست‌وجوی بیمار و اتصال حساب Keycloak پس از احراز شماره موبایل.</p>
+</section>
+
+@if (!string.IsNullOrWhiteSpace(feedback))
+{
+    <div class="admin-feedback @(feedbackIsError ? "error" : "success")" role="status">@feedback</div>
+}
+
+<section class="panel-card admin-section">
+    <div class="panel-heading">
+        <div>
+            <span class="eyebrow">پرونده‌های بیماران</span>
+            <h2>فهرست بیماران <small>(@patients.Count)</small></h2>
+        </div>
+        <button class="btn btn-primary" @onclick="NewPatient">＋ ثبت بیمار جدید</button>
+    </div>
+
+    <div class="admin-form-grid">
+        <label>
+            جست‌وجو بر اساس نام، نام خانوادگی یا موبایل
+            <input class="admin-input" @bind="searchTerm" placeholder="نام یا شماره موبایل..." />
+        </label>
+        <div class="admin-form-actions">
+            <button class="btn btn-outline" disabled="@loading" @onclick="LoadPatientsAsync">جست‌وجو</button>
+            <button class="btn btn-outline" disabled="@loading" @onclick="ClearSearch">پاک کردن</button>
+        </div>
+    </div>
+
+    @if (editorOpen)
+    {
+        <div class="admin-editor">
+            <h3>@(editingPatientId.HasValue ? "ویرایش پرونده بیمار" : "ثبت پرونده جدید")</h3>
+            <div class="admin-form-grid">
+                <label>نام
+                    <input class="admin-input" @bind="firstName" maxlength="100" />
+                </label>
+                <label>نام خانوادگی
+                    <input class="admin-input" @bind="lastName" maxlength="100" />
+                </label>
+                <label>شماره موبایل
+                    <input class="admin-input" @bind="mobileNumber" maxlength="30" inputmode="tel" dir="ltr" />
+                </label>
+                <label>تاریخ تولد (اختیاری)
+                    <input class="admin-input" type="date" @bind="birthDateText" dir="ltr" />
+                </label>
+            </div>
+            <div class="admin-form-actions">
+                <button class="btn btn-primary" disabled="@saving" @onclick="SavePatientAsync">
+                    @(saving ? "در حال ذخیره..." : "ذخیره پرونده")
+                </button>
+                <button class="btn btn-outline" disabled="@saving" @onclick="CloseEditor">انصراف</button>
+            </div>
+        </div>
+    }
+
+    @if (loading)
+    {
+        <div class="loading-line"><span></span> در حال دریافت فهرست بیماران...</div>
+    }
+    else if (loadFailed)
+    {
+        <div class="notice-card" role="alert">
+            <strong>دریافت فهرست بیماران ناموفق بود.</strong>
+            <p>@loadError</p>
+            <button class="btn btn-primary" @onclick="LoadPatientsAsync">تلاش مجدد</button>
+        </div>
+    }
+    else if (patients.Count == 0)
+    {
+        <div class="empty-inline">بیماری با این مشخصات یافت نشد.</div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>نام و نام خانوادگی</th>
+                        <th>موبایل</th>
+                        <th>تاریخ تولد</th>
+                        <th>وضعیت پرونده</th>
+                        <th>حساب کاربری</th>
+                        <th>عملیات</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var patient in patients)
+                    {
+                        <tr @key="patient.Id">
+                            <td>@patient.FirstName @patient.LastName</td>
+                            <td dir="ltr">@patient.MobileNumber</td>
+                            <td>@(patient.BirthDate?.ToString("yyyy/MM/dd") ?? "—")</td>
+                            <td><span class="admin-status @(patient.IsActive ? "active" : "inactive")">@(patient.IsActive ? "فعال" : "غیرفعال")</span></td>
+                            <td>
+                                @if (patient.HasLinkedIdentity)
+                                {
+                                    <span class="admin-status active">حساب متصل</span>
+                                }
+                                else
+                                {
+                                    <span class="admin-status inactive">بدون اتصال</span>
+                                }
+                            </td>
+                            <td>
+                                <div class="admin-form-actions">
+                                    <button class="btn btn-outline btn-small" @onclick="() => EditPatient(patient)">ویرایش</button>
+                                    <button class="btn btn-outline btn-small" disabled="@saving" @onclick="() => ToggleActiveAsync(patient)">
+                                        @(patient.IsActive ? "غیرفعال‌سازی" : "فعال‌سازی")
+                                    </button>
+                                    @if (!patient.HasLinkedIdentity)
+                                    {
+                                        <button class="btn btn-outline btn-small" @onclick="() => OpenLinkEditor(patient)">اتصال حساب</button>
+                                    }
+                                </div>
+                            </td>
+                        </tr>
+                        @if (linkingPatientId == patient.Id)
+                        {
+                            <tr>
+                                <td colspan="6">
+                                    <div class="admin-editor">
+                                        <h3>اتصال حساب Keycloak به پرونده @patient.FirstName @patient.LastName</h3>
+                                        <p>شناسه sub را از جزئیات کاربر در کنسول Keycloak بردارید. این عملیات حساب را به پرونده متصل می‌کند؛ شماره موبایل بیمار باید حضوری یا از روش معتبر احراز شده باشد.</p>
+                                        <label>شناسه کاربر (sub)
+                                            <input class="admin-input" @bind="identityUserId" dir="ltr" maxlength="128" autocomplete="off" />
+                                        </label>
+                                        <label class="admin-check-row">
+                                            <input type="checkbox" @bind="mobileNumberVerified" />
+                                            شماره موبایل این بیمار را بررسی و با حساب موردنظر تطبیق داده‌ام.
+                                        </label>
+                                        <div class="admin-form-actions">
+                                            <button class="btn btn-primary" disabled="@saving" @onclick="() => LinkIdentityAsync(patient)">
+                                                @(saving ? "در حال اتصال..." : "تأیید و اتصال حساب")
+                                            </button>
+                                            <button class="btn btn-outline" disabled="@saving" @onclick="CloseLinkEditor">انصراف</button>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>
+
+@code {
+    private List<PatientListItem> patients = [];
+    private bool loading = true;
+    private bool loadFailed;
+    private string? loadError;
+    private bool saving;
+    private bool editorOpen;
+    private bool feedbackIsError;
+    private string? feedback;
+    private Guid? editingPatientId;
+    private Guid? linkingPatientId;
+    private string searchTerm = "";
+    private string firstName = "";
+    private string lastName = "";
+    private string mobileNumber = "";
+    private string birthDateText = "";
+    private string identityUserId = "";
+    private bool mobileNumberVerified;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        await LoadPatientsAsync();
+        StateHasChanged();
+    }
+
+    private async Task LoadPatientsAsync()
+    {
+        loading = true;
+        loadFailed = false;
+        loadError = null;
+        var result = await ApiClient.GetPatientsResultAsync(searchTerm);
+        if (!result.Succeeded)
+        {
+            loadFailed = true;
+            loadError = result.Error ?? "خطای نامشخص هنگام دریافت اطلاعات رخ داد.";
+            patients = [];
+        }
+        else
+        {
+            patients = result.Data ?? [];
+        }
+        loading = false;
+    }
+
+    private async Task ClearSearch()
+    {
+        searchTerm = "";
+        await LoadPatientsAsync();
+    }
+
+    private void NewPatient()
+    {
+        editingPatientId = null;
+        firstName = "";
+        lastName = "";
+        mobileNumber = "";
+        birthDateText = "";
+        editorOpen = true;
+        linkingPatientId = null;
+        feedback = null;
+    }
+
+    private void EditPatient(PatientListItem patient)
+    {
+        editingPatientId = patient.Id;
+        firstName = patient.FirstName;
+        lastName = patient.LastName;
+        mobileNumber = patient.MobileNumber;
+        birthDateText = patient.BirthDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "";
+        editorOpen = true;
+        linkingPatientId = null;
+        feedback = null;
+    }
+
+    private void CloseEditor() => editorOpen = false;
+
+    private async Task SavePatientAsync()
+    {
+        if (string.IsNullOrWhiteSpace(firstName) || string.IsNullOrWhiteSpace(lastName) ||
+            string.IsNullOrWhiteSpace(mobileNumber))
+        {
+            ShowFeedback("نام، نام خانوادگی و شماره موبایل الزامی است.", true);
+            return;
+        }
+
+        DateOnly? birthDate = null;
+        if (!string.IsNullOrWhiteSpace(birthDateText))
+        {
+            if (!DateOnly.TryParseExact(birthDateText, "yyyy-MM-dd", CultureInfo.InvariantCulture,
+                    DateTimeStyles.None, out var parsedDate))
+            {
+                ShowFeedback("تاریخ تولد معتبر نیست.", true);
+                return;
+            }
+            birthDate = parsedDate;
+        }
+
+        saving = true;
+        var result = editingPatientId is Guid id
+            ? await ApiClient.UpdatePatientAsync(id, firstName.Trim(), lastName.Trim(), mobileNumber.Trim(), birthDate)
+            : await ApiClient.CreatePatientAsync(firstName.Trim(), lastName.Trim(), mobileNumber.Trim(), birthDate);
+        saving = false;
+
+        if (!result.Succeeded)
+        {
+            ShowFeedback(result.Message, true);
+            return;
+        }
+
+        editorOpen = false;
+        await LoadPatientsAsync();
+        ShowFeedback(result.Message, false);
+    }
+
+    private async Task ToggleActiveAsync(PatientListItem patient)
+    {
+        saving = true;
+        var result = await ApiClient.SetPatientActiveAsync(patient.Id, !patient.IsActive);
+        saving = false;
+        if (!result.Succeeded)
+        {
+            ShowFeedback(result.Message, true);
+            return;
+        }
+        await LoadPatientsAsync();
+        ShowFeedback(result.Message, false);
+    }
+
+    private void OpenLinkEditor(PatientListItem patient)
+    {
+        linkingPatientId = patient.Id;
+        identityUserId = "";
+        mobileNumberVerified = false;
+        editorOpen = false;
+        feedback = null;
+    }
+
+    private void CloseLinkEditor()
+    {
+        linkingPatientId = null;
+        identityUserId = "";
+        mobileNumberVerified = false;
+    }
+
+    private async Task LinkIdentityAsync(PatientListItem patient)
+    {
+        if (string.IsNullOrWhiteSpace(identityUserId))
+        {
+            ShowFeedback("شناسه sub حساب Keycloak را وارد کنید.", true);
+            return;
+        }
+        if (!mobileNumberVerified)
+        {
+            ShowFeedback("ابتدا احراز شماره موبایل را تأیید کنید.", true);
+            return;
+        }
+
+        saving = true;
+        var result = await ApiClient.LinkPatientIdentityAsync(patient.Id, identityUserId.Trim(), mobileNumberVerified);
+        saving = false;
+        if (!result.Succeeded)
+        {
+            ShowFeedback(result.Message, true);
+            return;
+        }
+
+        CloseLinkEditor();
+        await LoadPatientsAsync();
+        ShowFeedback("حساب Keycloak با موفقیت به پرونده بیمار متصل شد.", false);
+    }
+
+    private void ShowFeedback(string message, bool isError)
+    {
+        feedback = message;
+        feedbackIsError = isError;
+    }
+}
