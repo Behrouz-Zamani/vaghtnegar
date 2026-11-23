@@ -35,6 +35,38 @@ partial class VaghtNegarDbContextModelSnapshot : ModelSnapshot
             entity.ToTable("Appointments");
         });
 
+        modelBuilder.Entity<VaghtNegar.Domain.Entities.AppointmentPayment>(entity =>
+        {
+            entity.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("uniqueidentifier");
+            entity.Property<Guid>("AppointmentId").HasColumnType("uniqueidentifier");
+            entity.Property<Guid>("PatientId").HasColumnType("uniqueidentifier");
+            entity.Property<Guid>("DoctorId").HasColumnType("uniqueidentifier");
+            entity.Property<long>("AmountToman").HasColumnType("bigint");
+            entity.Property<VaghtNegar.Domain.Enums.AppointmentPaymentStatus>("Status").HasColumnType("int");
+            entity.Property<DateTimeOffset>("CreatedAtUtc").HasColumnType("datetimeoffset");
+            entity.Property<DateTimeOffset>("ExpiresAtUtc").HasColumnType("datetimeoffset");
+            entity.Property<string>("ReceiptReference").HasMaxLength(100).HasColumnType("nvarchar(100)");
+            entity.Property<string>("ReceiptContentType").HasMaxLength(50).HasColumnType("nvarchar(50)");
+            entity.Property<string>("ReceiptImageBase64").HasColumnType("nvarchar(max)");
+            entity.Property<DateTimeOffset?>("ReceiptSubmittedAtUtc").HasColumnType("datetimeoffset");
+            entity.Property<DateTimeOffset?>("ReviewedAtUtc").HasColumnType("datetimeoffset");
+            entity.Property<string>("ReviewedBy").HasMaxLength(128).HasColumnType("nvarchar(128)");
+            entity.Property<string>("ReviewNote").HasMaxLength(500).HasColumnType("nvarchar(500)");
+            entity.HasKey("Id");
+            entity.HasIndex("AppointmentId").IsUnique();
+            entity.HasIndex("ExpiresAtUtc");
+            entity.HasIndex("PatientId", "CreatedAtUtc");
+            entity.HasIndex("Status", "ExpiresAtUtc");
+            entity.ToTable("AppointmentPayments");
+        });
+
+        modelBuilder.Entity<VaghtNegar.Domain.Entities.AppointmentPayment>()
+            .HasOne("VaghtNegar.Domain.Entities.Appointment", "Appointment")
+            .WithMany()
+            .HasForeignKey("AppointmentId")
+            .OnDelete(DeleteBehavior.Cascade)
+            .IsRequired();
+
         modelBuilder.Entity<VaghtNegar.Domain.Entities.Clinic>(entity =>
         {
             entity.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("uniqueidentifier");
