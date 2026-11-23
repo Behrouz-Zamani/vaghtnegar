@@ -130,6 +130,47 @@ public sealed class AppointmentPaymentWorkflow(
             page, pageSize, ct);
     }
 
+    public async Task<BookingRequestDto?> GetMyRequestAsync(
+        Guid requestId, string identityUserId, CancellationToken ct)
+    {
+        var patientId = await db.Patients.Where(x => x.IdentityUserId == identityUserId && x.IsActive)
+            .Select(x => (Guid?)x.Id).FirstOrDefaultAsync(ct);
+        if (!patientId.HasValue) return null;
+
+        var booking = await db.AppointmentBookingRequests
+            .FirstOrDefaultAsync(x => x.Id == requestId && x.PatientId == patientId.Value, ct);
+        if (booking is null) return null;
+        if (booking.ExpireIfNeeded(DateTimeOffset.UtcNow)) await db.SaveChangesAsync(ct);
+        return await MapAsync(requestId, ct);
+    }
+
+    public async Task<BookingRequestDto> SubmitMyReceiptAsync(
+        Guid requestId, string identityUserId, SubmitPaymentReceiptRequest request, CancellationToken ct)
+    {
+        var patientId = await db.Patients.Where(x => x.IdentityUserId == identityUserId && x.IsActive)
+            .Select(x => (Guid?)x.Id).FirstOrDefaultAsync(ct);
+        if (!patientId.HasValue) throw new UnauthorizedAccessException("پرونده بیمار به حساب کاربری شما متصل نیست.");
+
+        var booking = await db.AppointmentBookingRequests
+            .FirstOrDefaultAsync(x => x.Id == requestId && x.PatientId == patientId.Value, ct)
+            ?? throw new KeyNotFoundException("درخواست نوبت متعلق به حساب شما یافت نشد.");
+        ApplyReceipt(booking, request);
+        await db.SaveChangesAsync(ct);
+        return await MapAsync(requestId, ct);
+    }
+
+    private static void ApplyReceipt(AppointmentBookingRequest booking, SubmitPaymentReceiptRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Base64Content))
+            throw new ArgumentException("تصویر رسید الزامی است.");
+        byte[] bytes;
+        try { bytes = Convert.FromBase64String(request.Base64Content); }
+        catch (FormatException) { throw new ArgumentException("محتوای تصویر رسید معتبر نیست."); }
+        if (bytes.Length > 5 * 1024 * 1024)
+            throw new ArgumentException("حجم تصویر رسید نباید بیشتر از ۵ مگابایت باشد.");
+        booking.SubmitReceipt(bytes, request.ContentType, request.FileName);
+    }
+
     public Task<BookingRequestsPageDto> GetPendingReviewAsync(int page, int pageSize, CancellationToken ct)
     {
         ValidatePaging(ref page, ref pageSize);
