@@ -137,8 +137,9 @@
         creatingHold = false;
         if (!result.Succeeded || result.Data is null)
         {
-            error = result.Error ?? "ثبت درخواست نوبت ناموفق بود. لطفاً ساعت آزاد دیگری انتخاب کنید.";
+            var message = result.Error ?? "ثبت درخواست نوبت ناموفق بود. لطفاً ساعت آزاد دیگری انتخاب کنید.";
             await LoadSlotsAsync();
+            error = message;
             return;
         }
 
