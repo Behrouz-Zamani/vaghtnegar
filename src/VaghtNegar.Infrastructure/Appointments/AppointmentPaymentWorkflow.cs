@@ -32,6 +32,8 @@ public sealed class AppointmentPaymentWorkflow(
         var now = DateTimeOffset.UtcNow;
         var doctor = await db.Doctors.FirstOrDefaultAsync(x => x.Id == doctorId && x.IsActive, ct)
             ?? throw new KeyNotFoundException("پزشک فعال یافت نشد.");
+        if (doctor.VisitFeeToman <= 0)
+            throw new InvalidOperationException("حق ویزیت این پزشک هنوز در پنل مدیریت تعیین نشده است.");
 
         var expired = await db.AppointmentBookingRequests
             .Where(x => (x.Status == AppointmentBookingRequestStatus.AwaitingLogin ||
