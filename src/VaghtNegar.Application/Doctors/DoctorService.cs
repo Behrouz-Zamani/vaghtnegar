@@ -44,6 +44,17 @@ public sealed class DoctorService(IDoctorRepository repository, IClinicRepositor
         return ToDto(doctor);
     }
 
+    public async Task<DoctorDto?> UpdateMyVisitFeeAsync(string identityUserId, long visitFeeToman, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(identityUserId)) return null;
+        if (visitFeeToman <= 0) throw new ArgumentOutOfRangeException(nameof(visitFeeToman), "حق ویزیت باید بیشتر از صفر باشد.");
+        var doctor = await repository.GetByIdentityUserIdAsync(identityUserId, ct);
+        if (doctor is null) return null;
+        doctor.UpdateVisitFee(visitFeeToman);
+        await repository.SaveChangesAsync(ct);
+        return ToDto(doctor);
+    }
+
     public async Task<DoctorDto?> SetActiveAsync(Guid id, bool isActive, CancellationToken ct)
     {
         var doctor = await repository.GetByIdAsync(id, ct);
