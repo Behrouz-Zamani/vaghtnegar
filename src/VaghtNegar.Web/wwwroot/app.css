@@ -98,3 +98,9 @@
 .patient-confirm-booking{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:15px;padding:13px;background:#f7faf9;border-radius:10px;color:#6c817a;font-size:10px}
 .patient-confirm-booking strong{color:#0f766e}
 @media(max-width:720px){.patient-profile-card{padding:12px}.patient-appointment{align-items:flex-start;flex-wrap:wrap;gap:9px}.patient-appointment-date{min-width:100px}.patient-appointment-main{min-width:calc(100% - 120px)}.patient-appointment-actions{width:100%;justify-content:space-between}.patient-booking-grid{grid-template-columns:1fr}.patient-booking-grid .patient-note-field{grid-column:auto}.patient-confirm-booking{align-items:flex-start;flex-direction:column}}
+
+/* Explicit mobile verification control on patient identity linking */
+.admin-verification-box{display:block;margin-top:14px;padding:14px 16px;background:#fff;border:1px solid #cfe5df;border-right:4px solid #0f766e;border-radius:10px}
+.admin-verification-toggle{display:flex!important;flex-direction:row!important;align-items:center;gap:11px!important;color:#24584f!important;font-size:12px!important;font-weight:700;cursor:pointer;line-height:1.9}
+.admin-verification-toggle input[type=checkbox]{appearance:auto!important;-webkit-appearance:checkbox!important;display:inline-block!important;visibility:visible!important;opacity:1!important;position:static!important;flex:0 0 21px;width:21px;height:21px;margin:0;accent-color:#0f766e;cursor:pointer}
+.admin-verification-box small{display:block;margin:8px 32px 0 0;color:#788b85;font-size:10px;line-height:1.9}
