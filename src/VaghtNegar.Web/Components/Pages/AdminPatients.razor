@@ -137,10 +137,13 @@
                                         <label>شناسه کاربر (sub)
                                             <input class="admin-input" @bind="identityUserId" dir="ltr" maxlength="128" autocomplete="off" />
                                         </label>
-                                        <label class="admin-check-row">
-                                            <input type="checkbox" @bind="mobileNumberVerified" />
-                                            شماره موبایل این بیمار را بررسی و با حساب موردنظر تطبیق داده‌ام.
-                                        </label>
+                                        <div class="admin-verification-box">
+                                            <label class="admin-verification-toggle" for="mobile-number-verified">
+                                                <input id="mobile-number-verified" type="checkbox" @bind="mobileNumberVerified" />
+                                                <span>شماره موبایل این بیمار را بررسی و با حساب موردنظر تطبیق داده‌ام.</span>
+                                            </label>
+                                            <small>برای اتصال حساب، تأیید این مورد الزامی است. فقط پس از احراز واقعی شماره، تیک را فعال کنید.</small>
+                                        </div>
                                         <div class="admin-form-actions">
                                             <button class="btn btn-primary" disabled="@saving" @onclick="() => LinkIdentityAsync(patient)">
                                                 @(saving ? "در حال اتصال..." : "تأیید و اتصال حساب")
