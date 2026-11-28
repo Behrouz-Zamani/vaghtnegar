@@ -29,8 +29,8 @@
                 <AuthorizeView>
                     <Authorized Context="auth">
                         <div class="user-chip">
-                            <span class="avatar">@Initial(auth.User.Identity?.Name)</span>
-                            <span class="user-name">@(!string.IsNullOrWhiteSpace(auth.User.Identity?.Name) ? auth.User.Identity!.Name : "کاربر")</span>
+                            <span class="avatar">@Initial(DisplayName(auth.User))</span>
+                            <span class="user-name" title="@DisplayName(auth.User)">@DisplayName(auth.User)</span>
                             <a class="logout-link" href="/account/logout" title="خروج">خروج</a>
                         </div>
                     </Authorized>
@@ -51,6 +51,32 @@
 </div>
 
 @code {
+    private static string DisplayName(ClaimsPrincipal user)
+    {
+        var directName = user.FindFirst("name")?.Value;
+        if (!string.IsNullOrWhiteSpace(directName))
+            return directName.Trim();
+
+        var givenName = user.FindFirst("given_name")?.Value;
+        var familyName = user.FindFirst("family_name")?.Value;
+        var fullName = string.Join(" ", new[] { givenName, familyName }
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value!.Trim()));
+        if (!string.IsNullOrWhiteSpace(fullName))
+            return fullName;
+
+        var preferredName = user.FindFirst("preferred_username")?.Value;
+        if (!string.IsNullOrWhiteSpace(preferredName))
+            return preferredName.Trim();
+
+        var identityName = user.Identity?.Name;
+        if (!string.IsNullOrWhiteSpace(identityName))
+            return identityName.Trim();
+
+        var email = user.FindFirst("email")?.Value;
+        return !string.IsNullOrWhiteSpace(email) ? email.Trim() : "حساب کاربری";
+    }
+
     private static string Initial(string? value) =>
         string.IsNullOrWhiteSpace(value) ? "ک" : value.Trim()[0].ToString();
 }
