@@ -99,8 +99,10 @@
 .patient-confirm-booking strong{color:#0f766e}
 @media(max-width:720px){.patient-profile-card{padding:12px}.patient-appointment{align-items:flex-start;flex-wrap:wrap;gap:9px}.patient-appointment-date{min-width:100px}.patient-appointment-main{min-width:calc(100% - 120px)}.patient-appointment-actions{width:100%;justify-content:space-between}.patient-booking-grid{grid-template-columns:1fr}.patient-booking-grid .patient-note-field{grid-column:auto}.patient-confirm-booking{align-items:flex-start;flex-direction:column}}
 
-/* Explicit mobile verification control on patient identity linking */
-.admin-verification-box{display:block;margin-top:14px;padding:14px 16px;background:#fff;border:1px solid #cfe5df;border-right:4px solid #0f766e;border-radius:10px}
-.admin-verification-toggle{display:flex!important;flex-direction:row!important;align-items:center;gap:11px!important;color:#24584f!important;font-size:12px!important;font-weight:700;cursor:pointer;line-height:1.9}
-.admin-verification-toggle input[type=checkbox]{appearance:auto!important;-webkit-appearance:checkbox!important;display:inline-block!important;visibility:visible!important;opacity:1!important;position:static!important;flex:0 0 21px;width:21px;height:21px;margin:0;accent-color:#0f766e;cursor:pointer}
-.admin-verification-box small{display:block;margin:8px 32px 0 0;color:#788b85;font-size:10px;line-height:1.9}
+/* Patient identity verification: compact, wrapping and contained inside the table cell */
+.admin-verification-box{display:block;width:100%;max-width:100%;min-width:0;overflow:hidden;margin-top:12px;padding:12px 14px;background:#fff;border:1px solid #cfe5df;border-right:4px solid #0f766e;border-radius:10px;white-space:normal}
+.admin-verification-toggle{display:flex!important;flex-direction:row!important;align-items:flex-start!important;justify-content:flex-start;width:100%;max-width:100%;min-width:0;gap:10px!important;color:#24584f!important;font-size:12px!important;font-weight:700;cursor:pointer;line-height:1.9;white-space:normal!important}
+.admin-verification-toggle span{display:block;flex:1 1 auto;min-width:0;white-space:normal!important;overflow-wrap:anywhere;word-break:normal}
+.admin-verification-toggle input[type=checkbox]{appearance:auto!important;-webkit-appearance:checkbox!important;display:block!important;visibility:visible!important;opacity:1!important;position:static!important;flex:0 0 19px;width:19px;height:19px;margin:3px 0 0;accent-color:#0f766e;cursor:pointer}
+.admin-verification-box small{display:block;max-width:100%;margin:7px 29px 0 0;color:#788b85;font-size:10px;line-height:1.9;white-space:normal!important;overflow-wrap:anywhere}
+@media(max-width:720px){.admin-verification-box{padding:10px 11px}.admin-verification-toggle{font-size:11px!important}.admin-verification-box small{margin-right:29px}}
